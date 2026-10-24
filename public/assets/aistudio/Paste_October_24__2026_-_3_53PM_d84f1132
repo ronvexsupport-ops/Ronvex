@@ -1,0 +1,1329 @@
+# RONVEX — COMPLETE E-COMMERCE & AFFILIATE PLATFORM
+
+## 1. YOUR ROLE AND OBJECTIVE
+
+Act as a senior full-stack software engineer, UI/UX designer, Firebase architect, security engineer, and e-commerce platform developer.
+
+Build a complete, modern, production-oriented e-commerce and affiliate management platform named **RONVEX**.
+
+This must be a real, functional web application, not just a static landing page, UI mockup, or frontend demonstration.
+
+The platform is intended primarily for the Bangladesh market, with the possibility of international expansion in the future.
+
+The application must include:
+1. Public e-commerce storefront.
+2. Secure admin portal.
+3. Affiliate registration and management portal.
+4. Individual affiliate storefronts and tracking links.
+5. Product pricing and affiliate commission management.
+6. Order management and tracking.
+7. Monthly sales targets and bonuses.
+8. Manual weekly payouts.
+9. Firebase-based authentication and database.
+10. External image hosting with image URLs stored in Firestore.
+11. Secure server-side business logic.
+12. A responsive, mobile-first user interface.
+
+Do not merely describe how to build the application. Create the actual application files and implement the functionality.
+
+If the project already contains files, inspect the existing structure before making changes. Preserve working functionality and integrate the new implementation appropriately.
+
+---
+
+## 2. TECHNOLOGY STACK
+
+Use the following architecture:
+
+- Frontend: React with TypeScript.
+- Build tool: Vite.
+- Styling: Tailwind CSS if compatible with the project; otherwise use a well-structured CSS solution.
+- Icons: Lucide React.
+- Authentication: Firebase Authentication.
+- Database: Cloud Firestore.
+- Server-side business logic: Firebase Cloud Functions using TypeScript.
+- Image hosting: An external image-hosting service such as Cloudinary or ImageKit.
+- Deployment: Vercel.
+- Source control: GitHub.
+
+Use stable, compatible package versions.
+
+Organize the code into reusable components, pages, services, hooks, types, and utilities.
+
+Do not place the entire application in a single component.
+
+If any external service requires credentials, implement its integration and provide clear configuration instructions. Never invent API credentials or claim that a service is connected when it is not.
+
+The application must not depend on Firebase Storage.
+
+---
+
+## 3. BRAND IDENTITY AND DESIGN
+
+Brand name: RONVEX.
+
+Brand positioning: A modern, trustworthy, ambitious e-commerce company with the professional feel of an international retail brand.
+
+Design requirements:
+
+- Premium, clean, modern interface.
+- Professional typography.
+- Strong visual hierarchy.
+- Consistent spacing and alignment.
+- Attractive product cards.
+- High-quality product image presentation.
+- Responsive navigation.
+- Fast-loading pages.
+- Accessible forms and buttons.
+- Useful loading, empty, error, and success states.
+- Mobile-first layouts that work well on Android phones.
+- Desktop layouts suitable for business administration.
+
+Use a sophisticated neutral color palette with a strong dark primary color and restrained accent colors.
+
+Avoid excessive gradients, oversized headers, cluttered dashboards, unnecessary animations, and generic template-like layouts.
+
+Use a consistent design system throughout the storefront, admin portal, affiliate portal, and individual affiliate storefronts.
+
+The primary customer-facing language may initially be English, but organize the application so Bangla can be added easily.
+
+Use BDT (৳) as the default currency.
+
+---
+
+## 4. USER ROLES AND ACCESS CONTROL
+
+Implement three main user roles:
+
+### A. Administrator
+Can manage products, orders, affiliate applications, pricing rules, commissions, sales targets, bonuses, payouts, and platform settings.
+
+### B. Affiliate Member
+Can manage their permitted storefront settings, set product selling prices within admin-defined limits, generate and use affiliate links, monitor attributed orders, view commissions, track sales targets, and request payouts.
+
+### C. Customer
+Can browse products, place orders, and track their own orders.
+
+Customers should be able to place orders without creating an account unless a later configuration explicitly enables mandatory accounts.
+
+Never trust a role, price, commission amount, order status, or payout amount supplied by the browser.
+
+Use secure server-side authorization and validate all sensitive operations.
+
+Affiliate users must never be able to access another affiliate's private dashboard, customer details, payout information, or attributed orders.
+
+Customers must not be able to access private admin or affiliate information.
+
+---
+
+## 5. AUTHENTICATION AND REGISTRATION
+
+Implement Firebase Authentication.
+
+### Administrator authentication
+
+- Provide a dedicated admin login page.
+- Only explicitly authorized administrator accounts may access the admin portal.
+- Do not provide public administrator registration.
+- Do not grant admin privileges merely because someone signs up using a particular email address.
+- Use Firebase custom claims or an equally secure server-controlled authorization mechanism.
+- Provide clear instructions for securely creating the initial administrator.
+
+### Affiliate registration
+
+Create an affiliate application form containing:
+
+- Full name.
+- Email address.
+- Mobile number.
+- Password.
+- Optional marketing or social media information.
+- Acceptance of affiliate terms.
+
+Validate all required fields.
+
+Use Firebase Authentication for account creation and email verification where appropriate.
+
+A new application must have a status of `PENDING`.
+
+An applicant must not gain affiliate privileges or access to the affiliate dashboard before approval.
+
+Provide appropriate application statuses:
+- PENDING
+- APPROVED
+- REJECTED
+- SUSPENDED
+
+An administrator can approve or reject applications and suspend existing affiliates.
+
+On approval, assign the affiliate role securely on the server.
+
+Display the application status to the applicant.
+
+Prevent duplicate applications and duplicate affiliate identities where practical.
+
+### Affiliate login
+
+Approved affiliates can sign in and access their dashboard.
+
+Pending, rejected, or suspended accounts must not be allowed to perform affiliate operations.
+
+Handle authentication errors and password recovery properly.
+
+---
+
+## 6. PUBLIC E-COMMERCE STOREFRONT
+
+Build a complete customer-facing storefront.
+
+### Homepage
+
+Include:
+- Professional navigation.
+- RONVEX logo or a clean text-based brand mark.
+- Product search.
+- Product categories.
+- Featured products.
+- New arrivals.
+- Promotional product sections.
+- Responsive product grids.
+- Product cards with image, name, price, and product details.
+- Footer with contact information, policies, and useful links.
+
+Do not insert fake products or fake sales figures into the live application.
+
+If sample data is needed for development, clearly separate it from production data.
+
+### Product catalog
+
+Support:
+- Product listing.
+- Category filtering.
+- Search.
+- Sorting.
+- Pagination or efficient incremental loading.
+- Product details.
+- Multiple product images.
+- Stock availability.
+- Product variants where appropriate.
+- Product descriptions.
+- Regular price and promotional price where configured.
+
+Only display active products available for sale.
+
+### Product detail page
+
+Include:
+- Product images.
+- Product name.
+- Product description.
+- Price.
+- Availability.
+- Quantity selector.
+- Add-to-cart button.
+- Buy-now option.
+- Related products when available.
+
+Validate stock and price again on the server during checkout.
+
+### Shopping cart
+
+Allow customers to:
+- Add products.
+- Change quantities.
+- Remove products.
+- Review item prices.
+- Review subtotal.
+- Review delivery charges when configured.
+- Proceed to checkout.
+
+Never trust prices submitted by the browser.
+
+The server must recalculate all order totals using authoritative product and pricing data.
+
+---
+
+## 7. CHECKOUT AND ORDER CREATION
+
+Create a simple, mobile-friendly checkout form.
+
+Collect:
+- Customer full name.
+- Mobile number.
+- Delivery address.
+- District and area when required.
+- Optional email.
+- Order notes where appropriate.
+
+Support Cash on Delivery as the initial payment method.
+
+Structure the payment module so other payment methods can be added later.
+
+Do not claim that online payments work unless a real payment provider has been integrated and configured.
+
+### Order processing
+
+When a customer places an order:
+
+1. Validate the request on the server.
+2. Fetch current product and pricing information from Firestore.
+3. Validate quantities and stock availability.
+4. Determine the applicable selling price.
+5. Calculate subtotal and delivery charges.
+6. Create a unique order ID.
+7. Save the order and order items.
+8. Record affiliate attribution when applicable.
+9. Set the initial order status.
+10. Display an order confirmation page.
+
+Use an appropriate Firestore transaction or equivalent reliable mechanism where necessary.
+
+Prevent duplicate order creation caused by repeated submissions.
+
+Generate an order number that is unique and suitable for customer-facing use.
+
+Store an order's accepted prices and affiliate attribution as an immutable historical snapshot. Later changes to a product or affiliate's selling price must not silently rewrite an existing order.
+
+---
+
+## 8. PRODUCT MANAGEMENT AND PRICING RULES
+
+Administrators must be able to create, edit, activate, deactivate, and archive products.
+
+Product fields should include:
+
+- Product ID.
+- Name.
+- Slug.
+- Description.
+- Category.
+- Image URLs.
+- Admin base price.
+- Maximum permitted affiliate price increase.
+- Stock quantity.
+- Active status.
+- Created and updated timestamps.
+
+### Example pricing rule
+
+Suppose:
+- Admin base price = ৳600.
+- Maximum permitted affiliate price increase = ৳150.
+
+The affiliate may set a selling price between ৳600 and ৳750.
+
+Examples:
+
+| Affiliate selling price | Gross affiliate margin |
+|---|---:|
+| ৳600 | ৳0 |
+| ৳650 | ৳50 |
+| ৳700 | ৳100 |
+| ৳750 | ৳150 |
+
+The formula is:
+
+`Gross Affiliate Margin = Accepted Selling Price - Admin Base Price`
+
+The maximum selling price is:
+
+`Maximum Selling Price = Admin Base Price + Maximum Permitted Increase`
+
+### Pricing security
+
+- Enforce price limits on the server.
+- Reject prices below the permitted minimum or above the permitted maximum.
+- Do not trust prices supplied by the browser.
+- Store the accepted selling price and base price in the order snapshot.
+- Preserve historical pricing when the administrator changes the product price later.
+- Recalculate the applicable limits whenever an affiliate attempts to update a selling price.
+
+### Price management interface
+
+In the affiliate portal, display the product's base price, minimum permitted selling price, maximum permitted selling price, current selling price, and estimated margin.
+
+Allow affiliates to select a selling price within the permitted range.
+
+Do not allow affiliates to modify the administrator's base price or maximum permitted increase.
+
+The administrator must be able to set a different maximum price increase for each product.
+
+---
+
+## 9. AFFILIATE STOREFRONTS AND TRACKING LINKS
+
+Every approved affiliate must receive a unique affiliate identifier and public storefront URL.
+
+Use a scalable URL structure, such as:
+
+`/affiliate/{affiliateSlug}`
+
+For example:
+
+`/affiliate/member-a`
+
+Do not hard-code individual affiliate pages.
+
+Build a reusable storefront template that dynamically loads the relevant affiliate and product information.
+
+### Affiliate storefront functionality
+
+Each affiliate storefront should:
+- Display the RONVEX brand.
+- Display available products.
+- Show the affiliate's permitted selling prices.
+- Provide product details.
+- Support add-to-cart and checkout.
+- Preserve affiliate attribution throughout the customer journey.
+
+Generate unique affiliate tracking links.
+
+A tracking link may use a parameter such as:
+
+`?ref=AFFILIATE_ID`
+
+Support product-specific affiliate links where practical.
+
+### Attribution requirements
+
+When a visitor enters through an affiliate link:
+
+1. Validate the affiliate identifier.
+2. Record the attribution using a suitable first-party mechanism.
+3. Preserve attribution across product pages, the cart, and checkout.
+4. Associate the resulting order with the correct affiliate.
+5. Record the attribution timestamp and relevant source information.
+6. Prevent customers from changing an affiliate ID to gain unauthorized benefits.
+7. Do not allow affiliate attribution to be supplied as proof of a commission entitlement without server-side validation.
+
+Define a configurable attribution policy.
+
+Use a reasonable default, such as last valid affiliate click within a configurable 30-day window, while preserving attribution already attached to an active checkout when appropriate.
+
+Document the attribution policy in the application.
+
+Do not claim perfect tracking across browsers or devices. Cookies may be cleared, browsers may block tracking, and customers may switch devices.
+
+Prevent self-referral if required by the affiliate policy.
+
+### Affiliate storefront customization
+
+Allow affiliates to configure only permitted public information, such as display name and profile image URL, if enabled by the administrator.
+
+Affiliates must not be able to change the RONVEX brand identity, platform pricing limits, or security-sensitive storefront settings.
+
+---
+
+## 10. AFFILIATE DASHBOARD
+
+Build a professional affiliate dashboard.
+
+Include summary cards for:
+- Total attributed orders.
+- Pending orders.
+- Confirmed orders.
+- Processing orders.
+- Shipped orders.
+- Delivered orders.
+- Cancelled or returned orders.
+- Gross attributed sales.
+- Total earned commission.
+- Pending commission.
+- Payable commission.
+- Paid commission.
+- Monthly sales target progress.
+- Monthly bonus status.
+
+Provide a searchable and filterable order table.
+
+Each affiliate should see only their own authorized data.
+
+### Affiliate order details
+
+Display:
+- Order ID.
+- Order date.
+- Product names and quantities.
+- Accepted selling prices.
+- Order status.
+- Delivery status.
+- Commission status.
+- Relevant customer details only when necessary and authorized for fulfillment.
+
+Mask sensitive customer information where practical.
+
+Do not expose customer information to affiliates who do not need it.
+
+### Affiliate link management
+
+Provide:
+- Personal storefront URL.
+- Copy-link button.
+- Product-specific tracking links.
+- Link generation controls.
+- A simple explanation of how tracking works.
+
+Do not fabricate visitor or conversion statistics. Only show analytics backed by actual recorded events.
+
+---
+
+## 11. COMMISSION MANAGEMENT
+
+Commission is based on the accepted affiliate selling price and the applicable administrator base price.
+
+Default formula:
+
+`Gross Affiliate Margin = Accepted Selling Price - Admin Base Price`
+
+However, commission must not automatically become payable when an order is placed.
+
+### Commission lifecycle
+
+Use clearly defined commission states, such as:
+- PENDING
+- ELIGIBLE
+- PAYABLE
+- PAID
+- REVERSED
+
+Recommended workflow:
+
+1. Order is created: commission is pending.
+2. Order is shipped: commission remains pending.
+3. Order is delivered: the order becomes eligible for sales-target calculation and commission processing.
+4. Apply any configured return or dispute policy.
+5. Once the applicable eligibility requirements are satisfied, mark the commission payable.
+6. When the administrator confirms a payout, mark the relevant commission amount as paid.
+7. If an order is cancelled or returned, apply the configured reversal or adjustment process.
+
+Provide a configurable return and adjustment policy.
+
+Do not automatically promise that a delivered order can never be returned.
+
+If a commission is reversed, retain an auditable record of the original amount and adjustment rather than deleting the historical transaction.
+
+### Commission reliability
+
+- Calculate commission on the server.
+- Use immutable order snapshots.
+- Prevent duplicate commission creation.
+- Use stable identifiers and idempotent processing.
+- Maintain a transaction ledger.
+- Record who initiated manual adjustments and when.
+- Never let an affiliate directly edit commission amounts or mark their own commissions paid.
+
+Clearly distinguish gross sales, gross affiliate margin, eligible commission, payable commission, and paid commission.
+
+Do not represent the affiliate margin as the platform's profit.
+
+---
+
+## 12. MONTHLY SALES TARGET AND BONUS SYSTEM
+
+Administrators must be able to configure monthly sales targets and bonuses.
+
+Example:
+- Monthly sales target: ৳100,000.
+- Bonus for achieving the target: ৳800.
+
+The target is based on the total accepted selling value of eligible delivered orders attributed to the affiliate during the applicable calendar month, subject to the platform's configured adjustment policy.
+
+### Essential rules
+
+- Pending orders do not count.
+- Confirmed orders do not count.
+- Processing orders do not count.
+- Shipped orders do not count.
+- Only delivered orders qualify.
+- Cancelled orders do not count.
+- Returned orders must be adjusted according to the configured return policy.
+- Do not count the same order more than once.
+- Use the configured Bangladesh business timezone for monthly boundaries.
+
+For each affiliate, display:
+- Monthly target.
+- Eligible delivered sales.
+- Percentage completed.
+- Remaining sales required.
+- Bonus amount.
+- Bonus eligibility status.
+- Bonus payment status.
+
+Example:
+
+| Eligible monthly sales | Progress | Bonus |
+|---|---:|---:|
+| ৳25,000 | 25% | ৳0 |
+| ৳50,000 | 50% | ৳0 |
+| ৳75,000 | 75% | ৳0 |
+| ৳100,000 | 100% | ৳800 |
+
+The example assumes a single ৳800 bonus for reaching the target.
+
+Do not issue the same monthly bonus repeatedly because of duplicate events or repeated status updates.
+
+Use an auditable monthly bonus record.
+
+### Admin controls
+
+Allow the administrator to:
+- Set a default monthly target.
+- Set the bonus amount.
+- Configure individual affiliate targets if required.
+- View progress for every affiliate.
+- Filter by month and affiliate.
+- Review bonus eligibility.
+- Record bonus payment status.
+
+Design the system so additional target tiers can be introduced later without rebuilding the entire application.
+
+---
+
+## 13. ADMIN DASHBOARD
+
+Build a comprehensive administration portal.
+
+### Dashboard overview
+
+Show real, database-backed summary cards for:
+- Total products.
+- Active products.
+- Total orders.
+- Orders awaiting confirmation.
+- Orders being processed.
+- Shipped orders.
+- Delivered orders.
+- Cancelled and returned orders.
+- Total attributed sales.
+- Affiliate applications awaiting review.
+- Approved affiliates.
+- Suspended affiliates.
+- Outstanding commissions.
+- Pending payouts.
+- Monthly sales-target progress.
+
+Do not hard-code dashboard statistics.
+
+### Product management
+
+Allow administrators to:
+- Add products.
+- Edit product information.
+- Upload or provide image URLs.
+- Set the base price.
+- Set the maximum permitted affiliate price increase.
+- Manage stock.
+- Manage categories.
+- Activate or deactivate products.
+- Archive products.
+
+### Affiliate management
+
+Allow administrators to:
+- View all applications.
+- Approve applications.
+- Reject applications.
+- Suspend or reactivate affiliates.
+- View affiliate profiles.
+- View each affiliate's attributed orders.
+- Review affiliate sales.
+- View commission and bonus histories.
+- Review payout requests.
+- View affiliate performance by month.
+
+### Order management
+
+Provide a searchable order table with filters for:
+- Order ID.
+- Date.
+- Customer phone.
+- Affiliate.
+- Product.
+- Payment method.
+- Order status.
+- Delivery status.
+
+Allow administrators to update order status through valid state transitions.
+
+Record every important status change with:
+- Previous status.
+- New status.
+- Timestamp.
+- Administrator ID.
+- Optional note.
+
+Do not allow a status update to silently create duplicate sales or commissions.
+
+### Admin order detail
+
+Display:
+- Customer details.
+- Delivery address.
+- Order items.
+- Quantity and accepted price per item.
+- Subtotal and delivery charge.
+- Order total.
+- Payment status.
+- Assigned affiliate.
+- Affiliate margin calculation.
+- Delivery status.
+- Order timeline.
+- Administrative notes.
+
+---
+
+## 14. ORDER AND PARCEL TRACKING
+
+Every order must have a unique order ID.
+
+Provide a public order-tracking page.
+
+Customers should be able to enter their order ID and an appropriate verification detail, such as the phone number used during checkout.
+
+Do not expose an order's private information based only on a predictable order ID.
+
+### Supported order statuses
+
+Use a consistent set of statuses, such as:
+- PENDING
+- CONFIRMED
+- PROCESSING
+- SHIPPED
+- DELIVERED
+- CANCELLED
+- RETURN_REQUESTED
+- RETURNED
+
+Separate order status from payment status when appropriate.
+
+Display a timeline showing relevant events.
+
+Administrators must be able to update statuses and add tracking notes.
+
+Include optional fields for:
+- Courier company.
+- Courier tracking number.
+- Shipment date.
+- Delivery date.
+
+Initially, support manual status updates.
+
+Design a modular integration point for future courier APIs, but do not claim automatic courier tracking unless a real integration is configured.
+
+Affiliate members can view the order and delivery status of their attributed orders, subject to privacy restrictions.
+
+---
+
+## 15. PAYOUT MANAGEMENT
+
+Implement a manual payout system.
+
+Default payout schedule: Every Wednesday.
+
+Default minimum payout request: ৳500.
+
+Supported payout methods:
+- bKash.
+- Nagad.
+- Bank transfer.
+
+Administrators must be able to configure these settings.
+
+### Affiliate payout interface
+
+Allow an affiliate to:
+- View payable balance.
+- View minimum withdrawal requirements.
+- Select a payout method.
+- Enter or select their payout details.
+- Submit a payout request.
+- View request status.
+- View previous payouts.
+
+Payout statuses:
+- REQUESTED
+- APPROVED
+- PROCESSING
+- PAID
+- REJECTED
+
+Validate that a payout request does not exceed the affiliate's available payable balance.
+
+Prevent overlapping requests from claiming the same balance.
+
+### Admin payout interface
+
+Allow the administrator to:
+- View all payout requests.
+- Filter requests by affiliate, date, amount, method, and status.
+- Approve or reject requests.
+- Record the payment reference.
+- Mark a payment as paid after the actual transfer.
+- Add internal notes.
+- View payout history.
+
+Manual status changes must update the payout ledger safely.
+
+Do not initiate real transfers unless a payment provider has actually been integrated.
+
+Clearly distinguish a recorded manual payment from a verified bank or mobile financial service transfer.
+
+---
+
+## 16. IMAGE HOSTING WITHOUT FIREBASE STORAGE
+
+Do not use Firebase Storage.
+
+Use an external image-hosting provider such as Cloudinary or ImageKit.
+
+Create an image service abstraction so the provider can be changed later.
+
+### Admin image management
+
+Allow the administrator to:
+- Upload an image from a computer or mobile device through the configured image service.
+- Paste an existing image URL.
+- Preview an image before saving.
+- Remove or replace an image reference.
+
+### Image storage requirements
+
+Store only the image URL and relevant image metadata in Firestore.
+
+Example:
+
+{
+  "productName": "Smart Watch",
+  "adminPrice": 600,
+  "maxAffiliateIncrease": 150,
+  "imageUrls": [
+    "https://example-image-host.com/smart-watch.jpg"
+  ]
+}
+
+This is an illustrative data structure, not a real image URL.
+
+Use the image provider's supported secure upload mechanism.
+
+Never expose a private API secret in frontend code.
+
+If unsigned uploads are supported, configure appropriate restrictions and upload limits.
+
+Otherwise, implement a secure server-side upload endpoint or a short-lived authorized upload process.
+
+Validate uploaded file types and sizes.
+
+Provide graceful fallback images if a URL is invalid or an image cannot load.
+
+All product images must be displayed consistently across the main storefront and affiliate storefronts.
+
+---
+
+## 17. FIREBASE DATABASE DESIGN
+
+Use Cloud Firestore as the primary application database.
+
+Create a clear, documented schema.
+
+Recommended collections include:
+
+### users
+- uid
+- displayName
+- email
+- phone
+- role
+- accountStatus
+- createdAt
+- updatedAt
+
+The authoritative role and approval status must be protected from client-side modification.
+
+### affiliateApplications
+- applicationId
+- uid
+- applicantDetails
+- applicationStatus
+- submittedAt
+- reviewedAt
+- reviewedBy
+- reviewNote
+
+### affiliates
+- affiliateId
+- uid
+- affiliateSlug
+- displayName
+- accountStatus
+- attributionSettings
+- createdAt
+- approvedAt
+
+### products
+- productId
+- name
+- slug
+- description
+- categoryId
+- imageUrls
+- adminBasePrice
+- maxAffiliateIncrease
+- stockQuantity
+- isActive
+- createdAt
+- updatedAt
+
+### affiliateProductPrices
+- affiliateId
+- productId
+- sellingPrice
+- updatedAt
+
+Validate every selling price against current permitted limits on the server.
+
+### orders
+- orderId
+- customerDetails
+- items
+- subtotal
+- deliveryCharge
+- total
+- affiliateId
+- attributionMetadata
+- orderStatus
+- paymentStatus
+- createdAt
+- updatedAt
+
+Store accepted item prices and other important pricing values as historical snapshots.
+
+### orderStatusHistory
+- orderId
+- previousStatus
+- newStatus
+- changedBy
+- changedAt
+- note
+
+### commissions
+- commissionId
+- orderId
+- affiliateId
+- amount
+- status
+- createdAt
+- updatedAt
+- adjustmentHistory
+
+### monthlyAffiliateStats
+- affiliateId
+- yearMonth
+- eligibleDeliveredSales
+- targetAmount
+- bonusAmount
+- bonusStatus
+- updatedAt
+
+### payouts
+- payoutId
+- affiliateId
+- requestedAmount
+- paymentMethod
+- payoutDetails
+- status
+- requestedAt
+- processedAt
+- processedBy
+- paymentReference
+
+### settings
+- currency
+- defaultMonthlyTarget
+- defaultMonthlyBonus
+- minimumPayout
+- payoutDay
+- attributionWindowDays
+- deliveryChargeSettings
+- returnPolicySettings
+
+### auditLogs
+- actorUid
+- action
+- resourceType
+- resourceId
+- timestamp
+- relevantChangeMetadata
+
+Adapt the schema when necessary, but preserve clear relationships, security boundaries, historical integrity, and efficient querying.
+
+Use server timestamps for authoritative events.
+
+Create the necessary Firestore indexes.
+
+Do not assume that creating a document automatically creates relational integrity. Validate referenced records and business constraints explicitly.
+
+---
+
+## 18. SECURITY RULES AND SERVER-SIDE VALIDATION
+
+Security is a mandatory part of the implementation.
+
+Create Firestore Security Rules and Firebase Cloud Functions.
+
+Implement the principle of least privilege.
+
+### Required security behavior
+
+- Only authorized administrators can manage platform-wide products, orders, settings, affiliate approvals, and payouts.
+- Affiliates can read and update only permitted fields of their own profiles.
+- Affiliates cannot approve themselves.
+- Affiliates cannot assign themselves an admin role.
+- Affiliates cannot modify their own commission records.
+- Affiliates cannot modify payout status.
+- Affiliates cannot edit platform-wide pricing rules.
+- Customers cannot read arbitrary customer records.
+- Customers cannot modify order totals or affiliate commissions.
+- All sensitive financial calculations are performed or validated on the server.
+- Public access to private Firestore collections must be denied.
+- Admin operations must be authorized server-side.
+- Firebase Admin SDK credentials and service account secrets must never be exposed in the browser.
+
+Use Firebase Authentication, custom claims where appropriate, server-side validation, and Firestore Security Rules together.
+
+Never rely on hidden buttons or frontend route guards as the only security mechanism.
+
+Generate secure, auditable status transitions.
+
+Provide clear instructions for deploying the Security Rules and Cloud Functions.
+
+Do not use open Firestore rules such as unrestricted public reads or writes.
+
+---
+
+## 19. FIREBASE CLOUD FUNCTIONS
+
+Implement server-side functions for important operations, including:
+
+- Affiliate approval and role assignment.
+- Secure product-price validation.
+- Order creation.
+- Order total calculation.
+- Stock validation and adjustment.
+- Affiliate attribution validation.
+- Commission creation.
+- Commission eligibility updates.
+- Delivered-order sales aggregation.
+- Monthly target calculation.
+- Monthly bonus qualification.
+- Payout request validation.
+- Payout ledger updates.
+- Administrative order status changes.
+- Relevant audit-log creation.
+
+Use transactions or batched writes where appropriate.
+
+Make event-driven functions idempotent.
+
+A repeated event must not create duplicate commission entries, double-count delivered sales, or award the same bonus multiple times.
+
+Protect against concurrent updates.
+
+Separate privileged server operations from client-side reads and permitted updates.
+
+If an operation requires an authenticated user, verify the Firebase ID token and role.
+
+If an operation is administrative, verify that the caller is authorized as an administrator.
+
+---
+
+## 20. APPLICATION ROUTES
+
+Implement a clear routing structure.
+
+Suggested routes:
+
+Public:
+- `/`
+- `/shop`
+- `/product/:slug`
+- `/category/:slug`
+- `/cart`
+- `/checkout`
+- `/order-confirmation/:orderId`
+- `/track-order`
+- `/affiliate/:affiliateSlug`
+- `/affiliate/:affiliateSlug/product/:productSlug`
+
+Authentication:
+- `/login`
+- `/affiliate/register`
+- `/affiliate/login`
+- `/affiliate/application-status`
+- `/forgot-password`
+
+Affiliate portal:
+- `/affiliate/dashboard`
+- `/affiliate/orders`
+- `/affiliate/products`
+- `/affiliate/links`
+- `/affiliate/commissions`
+- `/affiliate/targets`
+- `/affiliate/payouts`
+- `/affiliate/settings`
+
+Admin portal:
+- `/admin/login`
+- `/admin/dashboard`
+- `/admin/products`
+- `/admin/categories`
+- `/admin/orders`
+- `/admin/affiliates`
+- `/admin/applications`
+- `/admin/commissions`
+- `/admin/targets`
+- `/admin/payouts`
+- `/admin/reports`
+- `/admin/settings`
+
+Avoid conflicting route patterns. If necessary, adjust the route structure so public affiliate storefronts and authenticated affiliate portal pages remain unambiguous.
+
+Protect private routes appropriately.
+
+---
+
+## 21. REPORTING AND ANALYTICS
+
+Build database-backed reports for administrators.
+
+Include:
+- Sales by date range.
+- Orders by status.
+- Sales by product.
+- Sales by affiliate.
+- Delivered sales.
+- Cancelled and returned orders.
+- Affiliate commission liabilities.
+- Payout history.
+- Monthly target completion.
+- Bonus liabilities.
+
+Provide date filters and search.
+
+Do not display fabricated analytics.
+
+Define the meaning of every financial metric clearly.
+
+Distinguish order revenue from affiliate margin, outstanding commission, paid commission, and actual business profit.
+
+Do not calculate net business profit unless product costs, delivery costs, returns, and other relevant expenses have been captured.
+
+---
+
+## 22. USER EXPERIENCE AND ERROR HANDLING
+
+Implement:
+- Loading indicators.
+- Form validation.
+- Useful error messages.
+- Confirmation dialogs for destructive actions.
+- Success notifications.
+- Empty states.
+- Retry options for recoverable errors.
+- Authentication-expiration handling.
+- Network error handling.
+- Responsive tables or mobile-friendly cards.
+- Pagination for large datasets.
+- Search and filters.
+- Accessible form labels.
+
+Avoid blank pages when Firebase configuration is missing.
+
+If required configuration is missing, display a clear setup message in development mode.
+
+Do not silently substitute fake authentication or pretend that database operations succeeded.
+
+Do not use fake order submissions or local-only data as a substitute for the production Firebase integration.
+
+---
+
+## 23. PERFORMANCE AND SCALABILITY
+
+Build the application so it can grow beyond its initial small user base.
+
+Use:
+- Efficient Firestore queries.
+- Appropriate indexes.
+- Pagination.
+- Limited document sizes.
+- Reusable UI components.
+- Lazy loading where appropriate.
+- Image optimization.
+- Server-side validation.
+- Transactional updates for sensitive operations.
+
+Avoid fetching the entire database for dashboard calculations.
+
+Use suitable aggregation documents or server-side aggregation for large datasets.
+
+Do not assume unlimited free usage from Firebase or the external image provider.
+
+Document any required paid services, quotas, billing requirements, or operational limits.
+
+---
+
+## 24. VERCEL AND DEPLOYMENT REQUIREMENTS
+
+Prepare the application for deployment on Vercel.
+
+Include:
+- A valid `package.json`.
+- A valid Vite configuration.
+- Correct TypeScript configuration.
+- Correct production build scripts.
+- SPA routing configuration where needed.
+- A `.env.example` file.
+- Firebase initialization code.
+- Clear deployment instructions.
+- Required Firebase setup instructions.
+- Required Cloud Functions deployment instructions.
+- Firestore Security Rules.
+- Firestore index definitions.
+- Instructions for configuring the image provider.
+- Instructions for setting environment variables in Vercel.
+
+Never commit real secrets or private service-account credentials to GitHub.
+
+Use environment variables for public client configuration and secure server-side secret management for private credentials.
+
+Remember that frontend environment variables may be visible to users. Never put private API secrets in frontend variables.
+
+Document how to configure the required Firebase Authentication providers and authorized domains.
+
+Do not claim that the application is deployed or connected to Firebase until those operations have actually been completed.
+
+---
+
+## 25. IMPLEMENTATION WORKFLOW
+
+Follow this order while building the project:
+
+Phase 1:
+- Inspect the project.
+- Establish the application architecture.
+- Set up routing, reusable components, and the design system.
+
+Phase 2:
+- Build the storefront and product catalog.
+- Implement cart and checkout interfaces.
+
+Phase 3:
+- Integrate Firebase Authentication and Firestore.
+- Build secure admin authentication and role management.
+
+Phase 4:
+- Build product management and external image hosting integration.
+
+Phase 5:
+- Implement affiliate registration, approval, and account status handling.
+
+Phase 6:
+- Implement affiliate storefronts, tracking links, and affiliate-specific pricing.
+
+Phase 7:
+- Implement server-side order creation, order tracking, and status management.
+
+Phase 8:
+- Implement commission accounting, delivered-sales aggregation, monthly targets, and bonuses.
+
+Phase 9:
+- Implement manual payout requests and administration.
+
+Phase 10:
+- Add Security Rules, Cloud Functions, indexes, validation, and audit logs.
+
+Phase 11:
+- Run the production build.
+- Resolve TypeScript errors.
+- Resolve dependency and routing errors.
+- Check for missing imports.
+- Verify responsive behavior.
+- Review security-sensitive code.
+- Provide a concise setup and deployment guide.
+
+These phases are an implementation sequence, not a reason to stop after creating mockups.
+
+Complete as much of the actual application as the environment permits.
+
+If the environment cannot perform a deployment or connect an external account, implement the necessary code and explain the remaining manual setup steps.
+
+Do not claim a feature is fully operational unless its necessary backend, configuration, and validation are implemented.
+
+---
+
+## 26. TESTING REQUIREMENTS
+
+Add appropriate tests for critical business logic.
+
+At minimum, test:
+
+1. Affiliate registration creates a pending application.
+2. Pending affiliates cannot access protected affiliate operations.
+3. An administrator can approve an affiliate securely.
+4. An affiliate cannot approve themselves.
+5. A base price of ৳600 and maximum increase of ৳150 permit a selling price of ৳750.
+6. A selling price of ৳751 is rejected.
+7. A price below the permitted minimum is rejected.
+8. Affiliate attribution is preserved during checkout.
+9. An order is associated with the correct affiliate.
+10. A pending order does not count toward monthly sales.
+11. A shipped order does not count toward monthly sales.
+12. A delivered eligible order counts only once.
+13. Cancelled orders do not count toward the target.
+14. Returned orders follow the configured adjustment policy.
+15. A ৳100,000 eligible monthly sales total qualifies for the configured ৳800 bonus.
+16. Duplicate events do not create duplicate commissions or bonuses.
+17. Affiliates cannot read other affiliates' private data.
+18. Customers cannot read arbitrary orders.
+19. Payout requests cannot exceed the payable balance.
+20. A paid payout cannot be processed twice.
+
+Use appropriate Firebase emulators or automated tests when supported by the development environment.
+
+If a test cannot be run because external credentials or services are unavailable, report that limitation honestly.
+
+---
+
+## 27. FINAL DELIVERABLES
+
+Create the actual application source code and supporting configuration files.
+
+Deliver:
+- A functional React and TypeScript application.
+- Public e-commerce storefront.
+- Admin portal.
+- Affiliate portal.
+- Individual affiliate storefronts.
+- Firebase Authentication integration.
+- Firestore database integration.
+- Cloud Functions for sensitive business logic.
+- Firestore Security Rules.
+- Firestore index definitions.
+- External image hosting integration.
+- Commission and monthly bonus logic.
+- Manual payout management.
+- Order tracking.
+- Responsive UI.
+- Environment-variable example.
+- Setup and deployment documentation.
+- Relevant tests.
+
+The initial implementation must be honest about which features are fully implemented and which still require external credentials or manual configuration.
+
+Do not substitute nonfunctional buttons, hard-coded statistics, fake login screens, or simulated financial transactions for real functionality.
+
+Do not expose private credentials.
+
+Do not introduce Firebase Storage.
+
+Prioritize correctness, security, maintainability, and a professional user experience.
+
+**Begin by inspecting the existing project and then implement the application. Do not stop at a written plan or a visual prototype.**

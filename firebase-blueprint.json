@@ -1,0 +1,217 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role and account status",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 150 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "role": { "type": "string", "enum": ["admin", "affiliate", "customer"] },
+        "accountStatus": { "type": "string", "enum": ["active", "pending", "suspended"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "email", "role", "accountStatus"]
+    },
+    "AffiliateApplication": {
+      "title": "AffiliateApplication",
+      "description": "Application submitted by potential affiliate",
+      "type": "object",
+      "properties": {
+        "applicationId": { "type": "string" },
+        "uid": { "type": "string" },
+        "fullName": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 150 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "marketingExperience": { "type": "string", "maxLength": 500 },
+        "socialLinks": { "type": "string", "maxLength": 300 },
+        "applicationStatus": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED", "SUSPENDED"] },
+        "submittedAt": { "type": "string" },
+        "reviewedAt": { "type": "string" },
+        "reviewedBy": { "type": "string" },
+        "reviewNote": { "type": "string", "maxLength": 500 }
+      },
+      "required": ["applicationId", "uid", "fullName", "email", "phone", "applicationStatus"]
+    },
+    "Affiliate": {
+      "title": "Affiliate",
+      "description": "Approved affiliate storefront configuration and profile",
+      "type": "object",
+      "properties": {
+        "affiliateId": { "type": "string" },
+        "uid": { "type": "string" },
+        "affiliateSlug": { "type": "string", "maxLength": 50, "pattern": "^[a-z0-9_-]+$" },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "accountStatus": { "type": "string", "enum": ["APPROVED", "SUSPENDED", "PENDING"] },
+        "createdAt": { "type": "string" },
+        "approvedAt": { "type": "string" }
+      },
+      "required": ["affiliateId", "uid", "affiliateSlug", "displayName", "accountStatus"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Product catalog item with base price and affiliate markup ceiling",
+      "type": "object",
+      "properties": {
+        "productId": { "type": "string" },
+        "name": { "type": "string", "maxLength": 200 },
+        "slug": { "type": "string", "maxLength": 200 },
+        "description": { "type": "string", "maxLength": 4000 },
+        "categoryId": { "type": "string" },
+        "categoryName": { "type": "string" },
+        "adminBasePrice": { "type": "number" },
+        "maxAffiliateIncrease": { "type": "number" },
+        "stockQuantity": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["productId", "name", "slug", "adminBasePrice", "maxAffiliateIncrease", "stockQuantity", "isActive"]
+    },
+    "AffiliateProductPrice": {
+      "title": "AffiliateProductPrice",
+      "description": "Custom affiliate selling price bounded by base price and max increase",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "affiliateId": { "type": "string" },
+        "productId": { "type": "string" },
+        "sellingPrice": { "type": "number" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "affiliateId", "productId", "sellingPrice"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer order with immutable snapshot of accepted prices and affiliate attribution",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string" },
+        "orderNumber": { "type": "string" },
+        "customerFullName": { "type": "string", "maxLength": 100 },
+        "customerPhone": { "type": "string", "maxLength": 20 },
+        "customerAddress": { "type": "string", "maxLength": 300 },
+        "district": { "type": "string", "maxLength": 60 },
+        "subtotal": { "type": "number" },
+        "deliveryCharge": { "type": "number" },
+        "total": { "type": "number" },
+        "affiliateId": { "type": "string" },
+        "orderStatus": { "type": "string", "enum": ["PENDING", "CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED", "RETURN_REQUESTED", "RETURNED"] },
+        "paymentStatus": { "type": "string", "enum": ["PENDING", "PAID", "COD_CONFIRMED", "REFUNDED"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["orderId", "orderNumber", "customerFullName", "customerPhone", "customerAddress", "subtotal", "deliveryCharge", "total", "orderStatus"]
+    },
+    "Commission": {
+      "title": "Commission",
+      "description": "Affiliate commission record tied to order lifecycle",
+      "type": "object",
+      "properties": {
+        "commissionId": { "type": "string" },
+        "orderId": { "type": "string" },
+        "affiliateId": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["PENDING", "ELIGIBLE", "PAYABLE", "PAID", "REVERSED"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["commissionId", "orderId", "affiliateId", "amount", "status"]
+    },
+    "MonthlyAffiliateStat": {
+      "title": "MonthlyAffiliateStat",
+      "description": "Auditable monthly delivered order sales and bonus progress record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "affiliateId": { "type": "string" },
+        "yearMonth": { "type": "string" },
+        "eligibleDeliveredSales": { "type": "number" },
+        "targetAmount": { "type": "number" },
+        "bonusAmount": { "type": "number" },
+        "bonusStatus": { "type": "string", "enum": ["IN_PROGRESS", "QUALIFIED", "PAID"] },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "affiliateId", "yearMonth", "eligibleDeliveredSales", "targetAmount", "bonusAmount", "bonusStatus"]
+    },
+    "Payout": {
+      "title": "Payout",
+      "description": "Weekly manual payout request and disbursement ledger",
+      "type": "object",
+      "properties": {
+        "payoutId": { "type": "string" },
+        "affiliateId": { "type": "string" },
+        "requestedAmount": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["bkash", "nagad", "bank"] },
+        "status": { "type": "string", "enum": ["REQUESTED", "APPROVED", "PROCESSING", "PAID", "REJECTED"] },
+        "requestedAt": { "type": "string" },
+        "processedAt": { "type": "string" },
+        "processedBy": { "type": "string" },
+        "paymentReference": { "type": "string", "maxLength": 100 }
+      },
+      "required": ["payoutId", "affiliateId", "requestedAmount", "paymentMethod", "status", "requestedAt"]
+    },
+    "Setting": {
+      "title": "Setting",
+      "description": "Platform global configuration",
+      "type": "object",
+      "properties": {
+        "currency": { "type": "string" },
+        "currencySymbol": { "type": "string" },
+        "defaultMonthlyTarget": { "type": "number" },
+        "defaultMonthlyBonus": { "type": "number" },
+        "minimumPayout": { "type": "number" },
+        "payoutScheduleDay": { "type": "string" },
+        "attributionWindowDays": { "type": "number" }
+      },
+      "required": ["currency", "currencySymbol", "defaultMonthlyTarget", "defaultMonthlyBonus"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles partitioned by role"
+    },
+    "/affiliateApplications/{applicationId}": {
+      "schema": "AffiliateApplication",
+      "description": "Applications submitted by aspiring affiliates"
+    },
+    "/affiliates/{affiliateId}": {
+      "schema": "Affiliate",
+      "description": "Approved affiliates and their public storefront config"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Catalog products with base prices"
+    },
+    "/affiliateProductPrices/{priceId}": {
+      "schema": "AffiliateProductPrice",
+      "description": "Affiliate custom pricing bounded by admin limits"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer orders and immutable pricing snapshots"
+    },
+    "/commissions/{commissionId}": {
+      "schema": "Commission",
+      "description": "Commission records tied to attributed orders"
+    },
+    "/monthlyAffiliateStats/{statId}": {
+      "schema": "MonthlyAffiliateStat",
+      "description": "Monthly sales target records and bonus qualification"
+    },
+    "/payouts/{payoutId}": {
+      "schema": "Payout",
+      "description": "Payout ledger and requests"
+    },
+    "/settings/{settingId}": {
+      "schema": "Setting",
+      "description": "Platform global settings"
+    }
+  }
+}

@@ -1,0 +1,166 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper Functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email == 'ronvex.support@gmail.com' && request.auth.token.email_verified == true) ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isAffiliate(affiliateId) {
+      return isSignedIn() && (
+        (exists(/databases/$(database)/documents/affiliates/$(affiliateId)) &&
+         get(/databases/$(database)/documents/affiliates/$(affiliateId)).data.uid == request.auth.uid) ||
+        (request.auth.uid == affiliateId)
+      );
+    }
+
+    // Admins registry
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
+      allow list, write: if isAdmin();
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && request.auth.uid == userId &&
+        request.resource.data.role in ['affiliate', 'customer'] &&
+        request.resource.data.accountStatus in ['pending', 'active'];
+      allow update: if isSignedIn() && (
+        (request.auth.uid == userId &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'accountStatus', 'uid', 'createdAt'])) ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Platform Settings
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Products catalog
+    match /products/{productId} {
+      allow read: if isValidId(productId) && (resource.data.isActive == true || isAdmin());
+      allow write: if isValidId(productId) && isAdmin();
+    }
+
+    // Affiliate Applications
+    match /affiliateApplications/{applicationId} {
+      allow get: if isValidId(applicationId) && isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow list: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow create: if isValidId(applicationId) && isSignedIn() &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.applicationStatus == 'PENDING';
+      allow update: if isValidId(applicationId) && isAdmin();
+      allow delete: if isValidId(applicationId) && isAdmin();
+    }
+
+    // Approved Affiliates Profile & Storefront
+    match /affiliates/{affiliateId} {
+      allow read: if isValidId(affiliateId);
+      allow create: if isValidId(affiliateId) && isAdmin();
+      allow update: if isValidId(affiliateId) && (
+        isAdmin() ||
+        (isSignedIn() && resource.data.uid == request.auth.uid &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['accountStatus', 'uid', 'affiliateId', 'approvedAt', 'createdAt']))
+      );
+      allow delete: if isValidId(affiliateId) && isAdmin();
+    }
+
+    // Affiliate Custom Product Pricing
+    match /affiliateProductPrices/{priceId} {
+      allow read: if isValidId(priceId);
+      allow create, update: if isValidId(priceId) && (
+        isAdmin() ||
+        (isSignedIn() &&
+         (request.resource.data.affiliateId == request.auth.uid ||
+          (exists(/databases/$(database)/documents/affiliates/$(request.resource.data.affiliateId)) &&
+           get(/databases/$(database)/documents/affiliates/$(request.resource.data.affiliateId)).data.uid == request.auth.uid)))
+      );
+      allow delete: if isValidId(priceId) && (isAdmin() || (isSignedIn() && resource.data.affiliateId == request.auth.uid));
+    }
+
+    // Orders
+    match /orders/{orderId} {
+      allow get: if isValidId(orderId);
+      allow list: if isAdmin() || (isSignedIn() && resource.data.affiliateId == request.auth.uid);
+      allow create: if isValidId(orderId) &&
+        request.resource.data.subtotal is number &&
+        request.resource.data.deliveryCharge is number &&
+        request.resource.data.total is number &&
+        request.resource.data.orderStatus in ['PENDING', 'CONFIRMED'];
+      allow update: if isValidId(orderId) && (
+        isAdmin() ||
+        (isSignedIn() && resource.data.affiliateId == request.auth.uid &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['affiliateNotes']))
+      );
+      allow delete: if isValidId(orderId) && isAdmin();
+    }
+
+    // Order Status History
+    match /orderStatusHistory/{historyId} {
+      allow read: if isValidId(historyId) && (isAdmin() || isSignedIn());
+      allow create: if isValidId(historyId) && (isAdmin() || true);
+      allow update, delete: if isAdmin();
+    }
+
+    // Commissions
+    match /commissions/{commissionId} {
+      allow get: if isValidId(commissionId) && (
+        isAdmin() || (isSignedIn() && resource.data.affiliateId == request.auth.uid)
+      );
+      allow list: if isAdmin() || (isSignedIn() && resource.data.affiliateId == request.auth.uid);
+      allow write: if isValidId(commissionId) && isAdmin();
+    }
+
+    // Monthly Affiliate Stats & Bonus Tracking
+    match /monthlyAffiliateStats/{statId} {
+      allow get: if isValidId(statId) && (
+        isAdmin() || (isSignedIn() && resource.data.affiliateId == request.auth.uid)
+      );
+      allow list: if isAdmin() || (isSignedIn() && resource.data.affiliateId == request.auth.uid);
+      allow write: if isValidId(statId) && isAdmin();
+    }
+
+    // Payouts
+    match /payouts/{payoutId} {
+      allow get: if isValidId(payoutId) && (
+        isAdmin() || (isSignedIn() && resource.data.affiliateId == request.auth.uid)
+      );
+      allow list: if isAdmin() || (isSignedIn() && resource.data.affiliateId == request.auth.uid);
+      allow create: if isValidId(payoutId) && isSignedIn() &&
+        request.resource.data.affiliateId == request.auth.uid &&
+        request.resource.data.status == 'REQUESTED' &&
+        request.resource.data.requestedAmount > 0;
+      allow update: if isValidId(payoutId) && isAdmin();
+      allow delete: if isValidId(payoutId) && isAdmin();
+    }
+
+    // Audit Logs
+    match /auditLogs/{logId} {
+      allow read: if isValidId(logId) && isAdmin();
+      allow create: if isValidId(logId) && isSignedIn();
+      allow update, delete: if false;
+    }
+  }
+}
