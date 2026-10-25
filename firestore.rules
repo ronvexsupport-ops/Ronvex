@@ -18,7 +18,7 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        (request.auth.token.email == 'ronvex.support@gmail.com' && request.auth.token.email_verified == true) ||
+        request.auth.token.email == 'ronvex.support@gmail.com' ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
@@ -34,7 +34,8 @@ service cloud.firestore {
     // Admins registry
     match /admins/{adminId} {
       allow get: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
-      allow list, write: if isAdmin();
+      allow list: if isAdmin();
+      allow write: if isAdmin() || (isSignedIn() && request.auth.token.email == 'ronvex.support@gmail.com' && request.auth.uid == adminId);
     }
 
     // User profiles
@@ -159,8 +160,44 @@ service cloud.firestore {
     // Audit Logs
     match /auditLogs/{logId} {
       allow read: if isValidId(logId) && isAdmin();
-      allow create: if isValidId(logId) && isSignedIn();
+      allow create: if isValidId(logId) && (isAdmin() || isSignedIn());
       allow update, delete: if false;
+    }
+
+    // Website CMS & Homepage Builder Sections
+    match /cms/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // CMS Dynamic Pages (About, Contact, FAQ, Terms, etc.)
+    match /pages/{pageId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Product Categories
+    match /categories/{catId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Media & Image Library
+    match /media/{mediaId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Coupons & Promotions
+    match /coupons/{couponId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Contact Messages & Inquiries
+    match /contactMessages/{msgId} {
+      allow create: if isValidId(msgId);
+      allow read, update, delete: if isAdmin();
     }
   }
 }

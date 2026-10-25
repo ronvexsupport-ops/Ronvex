@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { ShoppingBag, Search, User, ShieldCheck, TrendingUp, LogOut, CheckCircle, ChevronDown, Menu, X, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ShoppingBag, Search, User, ShieldCheck, TrendingUp, LogOut, ChevronDown, Menu, X, ArrowRight, Lock } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
-import { PricingEngine } from '../services/pricingEngine';
+import { CMSService, DEFAULT_HEADER_CONFIG } from '../services/cmsService';
+import { HeaderConfig } from '../types';
 
 interface NavbarProps {
   currentView: string;
@@ -12,9 +13,22 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, affiliateStorefrontSlug }) => {
   const { itemCount, setIsCartOpen, activeAttribution } = useCart();
-  const { appUser, isAdmin, isAffiliate, logout, loginAsDemoAdmin, loginAsDemoAffiliate, isDemoMode } = useAuth();
-  const [showRoleMenu, setShowRoleMenu] = useState(false);
+  const { currentUser, appUser, adminRecord, isAdmin, isAffiliate, logout } = useAuth();
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [headerConfig, setHeaderConfig] = useState<HeaderConfig>(DEFAULT_HEADER_CONFIG);
+
+  useEffect(() => {
+    const fetchHeader = async () => {
+      try {
+        const config = await CMSService.getHeaderConfig();
+        if (config) setHeaderConfig(config);
+      } catch (e) {
+        console.warn('Navbar: Error loading header config:', e);
+      }
+    };
+    fetchHeader();
+  }, []);
 
   const handleMobileNav = (view: string, param?: string) => {
     setShowMobileMenu(false);
@@ -24,24 +38,30 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, affilia
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
       {/* Top Banner for Affiliate Storefront or Global Announcement */}
-      {affiliateStorefrontSlug && (
+      {affiliateStorefrontSlug ? (
         <div className="bg-slate-900 text-white text-xs py-1.5 px-4 text-center">
           <span className="font-medium">Special Partner Storefront</span>
           <span className="mx-2 text-slate-400">·</span>
           <span>Curated pricing & exclusive verified deals through RONVEX</span>
         </div>
+      ) : (
+        headerConfig.topNoticeEnabled && headerConfig.topNoticeText && (
+          <div className="bg-slate-900 text-white text-xs py-1.5 px-4 text-center">
+            <span>{headerConfig.topNoticeText}</span>
+          </div>
+        )
       )}
 
-      {/* Strict 3-Zone Header Contract */}
+      {/* 3-Zone Header Contract */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4 sm:gap-8">
-        {/* Zone 1: Brand Wordmark (Single text element) */}
+        {/* Zone 1: Brand Wordmark */}
         <div className="flex items-center gap-3 shrink-0">
           <button
             type="button"
             onClick={() => onNavigate('home')}
             className="text-xl font-extrabold tracking-tight text-slate-950 font-serif hover:opacity-85 transition-opacity text-left"
           >
-            RONVEX
+            {headerConfig.brandName || 'RONVEX'}
           </button>
           {activeAttribution && !affiliateStorefrontSlug && (
             <span className="hidden sm:inline-block text-[11px] text-slate-500 font-mono tracking-tight bg-slate-100 px-2 py-0.5 rounded">
@@ -95,7 +115,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, affilia
           </button>
         </nav>
 
-        {/* Zone 3: Primary Action & Context Controls */}
+        {/* Zone 3: Primary Action & Authentication Controls */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {/* Join Affiliate Program Header Button for visitors */}
           {!isAffiliate && (
@@ -108,106 +128,96 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, affilia
             </button>
           )}
 
-          {/* Quick Role Switcher for Testing & Demonstration */}
+          {/* Real Authentication Account / Admin Menu */}
           <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowRoleMenu(!showRoleMenu)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-              title="Switch user role or access diagnostic tools"
-            >
-              <User className="w-3.5 h-3.5 text-slate-500" />
-              <span className="hidden sm:inline">
-                {appUser ? (isAdmin ? 'Admin' : isAffiliate ? 'Affiliate' : 'Customer') : 'Role Demo'}
-              </span>
-              <ChevronDown className="w-3 h-3 text-slate-500" />
-            </button>
+            {currentUser ? (
+              <button
+                type="button"
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              >
+                {isAdmin ? (
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                ) : (
+                  <User className="w-3.5 h-3.5 text-slate-600" />
+                )}
+                <span className="hidden sm:inline font-medium">
+                  {adminRecord?.displayName || appUser?.displayName || (isAdmin ? 'Admin' : 'Account')}
+                </span>
+                <ChevronDown className="w-3 h-3 text-slate-500" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onNavigate('admin-portal')}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                title="Admin Sign In"
+              >
+                <Lock className="w-3.5 h-3.5 text-slate-500" />
+                <span className="hidden sm:inline">Admin Access</span>
+              </button>
+            )}
 
-            {showRoleMenu && (
-              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 text-xs animate-fade-in">
-                <div className="px-3 py-1.5 border-b border-slate-100">
-                  <p className="font-semibold text-slate-900">Platform Persona Switch</p>
-                  <p className="text-[11px] text-slate-500">Test roles & admin privileges</p>
+            {showUserMenu && currentUser && (
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 text-xs animate-fade-in">
+                <div className="px-3 py-2 border-b border-slate-100">
+                  <p className="font-semibold text-slate-900 truncate">
+                    {adminRecord?.displayName || appUser?.displayName || 'User'}
+                  </p>
+                  <p className="text-[10px] text-slate-500 font-mono truncate">{currentUser.email}</p>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    loginAsDemoAdmin();
-                    setShowRoleMenu(false);
-                    onNavigate('admin-portal');
-                  }}
-                  className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-800"
-                >
-                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  <div>
-                    <div className="font-medium">Administrator View</div>
-                    <div className="text-[10px] text-slate-500">ronvex.support@gmail.com</div>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    loginAsDemoAffiliate();
-                    setShowRoleMenu(false);
-                    onNavigate('affiliate-dashboard');
-                  }}
-                  className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-800"
-                >
-                  <TrendingUp className="w-4 h-4 text-blue-600" />
-                  <div>
-                    <div className="font-medium">Affiliate Partner View</div>
-                    <div className="text-[10px] text-slate-500">Slug: techdeals-bd</div>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowRoleMenu(false);
-                    onNavigate('affiliate-register');
-                  }}
-                  className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-800"
-                >
-                  <ArrowRight className="w-4 h-4 text-slate-600" />
-                  <div>
-                    <div className="font-medium">Join Affiliate Program</div>
-                    <div className="text-[10px] text-slate-500">Applicant registration form</div>
-                  </div>
-                </button>
-
-                {appUser && (
-                  <div className="pt-1 mt-1 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        logout();
-                        setShowRoleMenu(false);
-                        onNavigate('home');
-                      }}
-                      className="w-full text-left px-3 py-1.5 hover:bg-rose-50 text-rose-600 flex items-center gap-2"
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                      <span>Sign Out</span>
-                    </button>
-                  </div>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      onNavigate('admin-portal');
+                    }}
+                    className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-800"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <div>
+                      <div className="font-semibold">Operations Hub</div>
+                      <div className="text-[10px] text-slate-500">Website CMS & Management</div>
+                    </div>
+                  </button>
                 )}
+
+                {isAffiliate && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      onNavigate('affiliate-dashboard');
+                    }}
+                    className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-800"
+                  >
+                    <TrendingUp className="w-4 h-4 text-blue-600" />
+                    <div>
+                      <div className="font-semibold">Affiliate Dashboard</div>
+                      <div className="text-[10px] text-slate-500">Earnings & Storefront</div>
+                    </div>
+                  </button>
+                )}
+
+                <div className="pt-1 mt-1 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setShowUserMenu(false);
+                      await logout();
+                      onNavigate('home');
+                    }}
+                    className="w-full text-left px-3 py-1.5 hover:bg-rose-50 text-rose-600 flex items-center gap-2"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
-
-          {/* Admin shortcut button if logged in as Admin */}
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={() => onNavigate('admin-portal')}
-              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors whitespace-nowrap"
-            >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Admin Console</span>
-            </button>
-          )}
 
           {/* Cart Trigger */}
           <button
@@ -303,7 +313,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, affilia
                 onClick={() => handleMobileNav('admin-portal')}
                 className="text-left py-2 px-3 text-xs font-semibold text-slate-900 bg-slate-100 rounded-lg"
               >
-                Admin Console
+                Operations Hub (Admin)
               </button>
             )}
           </div>

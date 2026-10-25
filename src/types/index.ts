@@ -227,3 +227,230 @@ export interface AttributionData {
   affiliateSlug: string;
   timestamp: number;
 }
+
+// ---------------- Admin Roles & Access ----------------
+export type AdminRole = 'super_admin' | 'content_editor' | 'product_manager' | 'order_manager' | 'finance_manager';
+
+export interface AdminUserRecord {
+  uid: string;
+  email: string;
+  displayName: string;
+  role: AdminRole;
+  isActive: boolean;
+  createdAt: string;
+  lastLoginAt?: string;
+  addedBy?: string;
+}
+
+// ---------------- CMS & Homepage Builder ----------------
+export interface HeroSectionConfig {
+  badgeText: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  primaryButtonText: string;
+  primaryButtonUrl: string;
+  secondaryButtonText: string;
+  secondaryButtonUrl: string;
+  bgImageUrl: string;
+  enabled: boolean;
+}
+
+export interface PromoBannerConfig {
+  enabled: boolean;
+  text: string;
+  highlightText: string;
+  linkText: string;
+  linkUrl: string;
+}
+
+export interface FeaturedSectionConfig {
+  enabled: boolean;
+  title: string;
+  subtitle: string;
+  displayCount: number;
+}
+
+export interface PopularSectionConfig {
+  enabled: boolean;
+  title: string;
+  subtitle: string;
+  displayCount: number;
+}
+
+export interface CategorySectionConfig {
+  enabled: boolean;
+  title: string;
+  subtitle: string;
+}
+
+export interface TrustBadgeItem {
+  id: string;
+  title: string;
+  description: string;
+  iconName: string;
+}
+
+export interface AffiliatePromoSectionConfig {
+  enabled: boolean;
+  badge: string;
+  title: string;
+  description: string;
+  buttonText: string;
+  buttonUrl: string;
+  bulletPoints: string[];
+}
+
+export interface NewsletterSectionConfig {
+  enabled: boolean;
+  title: string;
+  description: string;
+  placeholder: string;
+  buttonText: string;
+  disclaimer: string;
+}
+
+export interface HomepageCMSConfig {
+  id: string; // 'homepage'
+  isPublished: boolean;
+  hero: HeroSectionConfig;
+  promoBanner: PromoBannerConfig;
+  featuredSection: FeaturedSectionConfig;
+  popularSection: PopularSectionConfig;
+  categorySection: CategorySectionConfig;
+  trustBadges: TrustBadgeItem[];
+  affiliatePromo: AffiliatePromoSectionConfig;
+  newsletter: NewsletterSectionConfig;
+  updatedAt: string;
+  updatedBy?: string;
+}
+
+// ---------------- Dynamic Custom Pages ----------------
+export interface CustomPage {
+  pageId: string;
+  slug: string;
+  title: string;
+  content: string; // Markdown or formatted text
+  metaTitle?: string;
+  metaDescription?: string;
+  isPublished: boolean;
+  showInHeader: boolean;
+  showInFooter: boolean;
+  order: number;
+  updatedAt: string;
+  updatedBy?: string;
+}
+
+// ---------------- Navigation & Footer ----------------
+export interface NavItem {
+  id: string;
+  label: string;
+  url: string;
+  isExternal?: boolean;
+}
+
+export interface HeaderConfig {
+  id: string; // 'header'
+  brandName: string;
+  logoUrl?: string;
+  topNoticeEnabled: boolean;
+  topNoticeText: string;
+  navItems: NavItem[];
+  supportPhone: string;
+  supportEmail: string;
+  updatedAt: string;
+}
+
+export interface FooterColumn {
+  id: string;
+  title: string;
+  links: { label: string; url: string }[];
+}
+
+export interface FooterConfig {
+  id: string; // 'footer'
+  aboutText: string;
+  columns: FooterColumn[];
+  address: string;
+  phone: string;
+  email: string;
+  facebookUrl?: string;
+  instagramUrl?: string;
+  youtubeUrl?: string;
+  copyrightText: string;
+  updatedAt: string;
+}
+
+// ---------------- Theme & Appearance ----------------
+export interface ThemeConfig {
+  id: string; // 'theme'
+  brandName: string;
+  primaryColor: string; // Hex e.g. #0f172a
+  accentColor: string; // Hex e.g. #059669
+  fontFamily: 'serif' | 'sans' | 'mono';
+  bannerBgColor: string;
+  announcementBarColor: string;
+  updatedAt: string;
+}
+
+// ---------------- SEO Settings ----------------
+export interface SEOSettings {
+  id: string; // 'seo'
+  metaTitle: string;
+  metaDescription: string;
+  keywords: string;
+  ogImage: string;
+  canonicalUrl: string;
+  updatedAt: string;
+}
+
+// ---------------- Media Assets ----------------
+export interface MediaAsset {
+  id: string;
+  title: string;
+  url: string;
+  category: 'banner' | 'product' | 'logo' | 'marketing' | 'other';
+  altText: string;
+  uploadedAt: string;
+  uploadedBy?: string;
+}
+
+// ---------------- Coupons & Discounts ----------------
+export interface Coupon {
+  couponId: string;
+  code: string;
+  discountType: 'PERCENTAGE' | 'FIXED';
+  discountAmount: number;
+  minOrderAmount: number;
+  maxDiscount?: number;
+  startDate: string;
+  endDate: string;
+  usageLimit?: number;
+  usageCount: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+// ---------------- Contact Inquiries ----------------
+export interface ContactMessage {
+  id: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+  subject: string;
+  message: string;
+  status: 'UNREAD' | 'READ' | 'REPLIED';
+  submittedAt: string;
+  replyNote?: string;
+}
+
+// ---------------- Activity / Audit Logs ----------------
+export interface ActivityLog {
+  id: string;
+  adminId: string;
+  adminEmail: string;
+  action: string;
+  module: string;
+  details: string;
+  timestamp: string;
+}

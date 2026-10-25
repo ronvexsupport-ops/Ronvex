@@ -23,6 +23,7 @@ import { AffiliateRegisterPage } from './pages/AffiliateRegisterPage';
 import { AffiliateStatusPage } from './pages/AffiliateStatusPage';
 import { AffiliateDashboardPage } from './pages/AffiliateDashboardPage';
 import { AdminPortalPage } from './pages/AdminPortalPage';
+import { CustomContentPage } from './pages/CustomContentPage';
 
 function AppContent() {
   const { setActiveAttribution } = useCart();
@@ -112,6 +113,10 @@ function AppContent() {
           setCurrentView('affiliate-storefront');
           setViewParam(slug);
         }
+      } else if (hash.startsWith('page/')) {
+        const slug = hash.replace('page/', '');
+        setCurrentView('page');
+        setViewParam(slug);
       } else if (hash.startsWith('product/')) {
         const slug = hash.replace('product/', '');
         const p = products.find(prod => prod.slug === slug);
@@ -149,6 +154,7 @@ function AppContent() {
     else if (targetView === 'affiliate-register') window.location.hash = 'affiliate/register';
     else if (targetView === 'affiliate-dashboard') window.location.hash = 'affiliate/dashboard';
     else if (targetView === 'admin-portal') window.location.hash = 'admin';
+    else if (targetView === 'page' && param) window.location.hash = `page/${param}`;
   };
 
   const handleSelectProduct = (product: Product, customPrice?: number) => {
@@ -251,6 +257,14 @@ function AppContent() {
             products={products}
             onRefreshProducts={loadCatalog}
             onOpenDiagnostics={() => setShowDiagnostics(true)}
+            onNavigateHome={() => handleNavigate('home')}
+          />
+        )}
+
+        {currentView === 'page' && (
+          <CustomContentPage
+            slug={viewParam || 'about-us'}
+            onNavigate={handleNavigate}
           />
         )}
       </main>

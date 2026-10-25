@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { CheckCircle2, AlertCircle, ArrowRight, ShieldCheck, TrendingUp, DollarSign, Calendar } from 'lucide-react';
 import { AffiliateService } from '../services/affiliateService';
 import { useAuth } from '../context/AuthContext';
+import { auth } from '../services/firebase';
 
 interface AffiliateRegisterPageProps {
   onNavigate: (view: string, param?: string) => void;
@@ -50,7 +51,7 @@ export const AffiliateRegisterPage: React.FC<AffiliateRegisterPageProps> = ({ on
       if (!uid) {
         // Register user account via Firebase auth
         await registerWithEmail(email.trim(), password, fullName.trim());
-        uid = `aff_app_${Date.now()}`;
+        uid = auth.currentUser?.uid || `aff_app_${Date.now()}`;
       }
 
       const application = await AffiliateService.submitApplication({

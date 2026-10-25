@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Truck, RotateCcw, PhoneCall } from 'lucide-react';
+import { CMSService, DEFAULT_FOOTER_CONFIG } from '../services/cmsService';
+import { FooterConfig } from '../types';
 
 interface FooterProps {
   onNavigate: (view: string, param?: string) => void;
@@ -7,6 +9,47 @@ interface FooterProps {
 }
 
 export const Footer: React.FC<FooterProps> = ({ onNavigate, onOpenDiagnostics }) => {
+  const [footerConfig, setFooterConfig] = useState<FooterConfig>(DEFAULT_FOOTER_CONFIG);
+
+  useEffect(() => {
+    const fetchFooter = async () => {
+      try {
+        const config = await CMSService.getFooterConfig();
+        if (config) setFooterConfig(config);
+      } catch (e) {
+        console.warn('Footer: Error loading footer config:', e);
+      }
+    };
+    fetchFooter();
+  }, []);
+
+  const handleLinkClick = (url: string) => {
+    if (!url) return;
+    const clean = url.replace(/^#\/?/, '');
+    if (clean.includes('affiliate/register') || clean === 'affiliate-register' || clean === 'register') {
+      onNavigate('affiliate-register');
+    } else if (clean.includes('affiliate/status') || clean === 'affiliate-status') {
+      onNavigate('affiliate-status');
+    } else if (clean.includes('affiliate/dashboard') || clean === 'affiliate-dashboard') {
+      onNavigate('affiliate-dashboard');
+    } else if (clean.startsWith('page/')) {
+      onNavigate('page', clean.replace('page/', ''));
+    } else if (clean.startsWith('shop')) {
+      const parts = clean.split('?category=');
+      if (parts.length > 1) {
+        onNavigate('shop', parts[1]);
+      } else {
+        onNavigate('shop');
+      }
+    } else if (clean === 'track-order') {
+      onNavigate('track-order');
+    } else if (clean === 'admin' || clean === 'admin-portal') {
+      onNavigate('admin-portal');
+    } else {
+      onNavigate(clean);
+    }
+  };
+
   return (
     <footer className="bg-slate-950 text-slate-300 border-t border-slate-900 mt-20">
       {/* Trust & Guarantee Strip */}
@@ -51,98 +94,51 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onOpenDiagnostics })
         <div className="space-y-3">
           <div className="text-xl font-bold font-serif text-white tracking-tight">RONVEX</div>
           <p className="text-xs text-slate-400 leading-relaxed">
-            Leading modern e-commerce and affiliate ecosystem in Bangladesh. Engineered with transparent affiliate pricing, automated margin attribution, and reliable nationwide fulfillment.
+            {footerConfig.aboutText}
           </p>
-          <div className="text-xs text-slate-500 pt-2">
-            <div>House 42, Road 11, Banani, Dhaka-1213</div>
-            <div>support@ronvex.com · +880 1711-000000</div>
+          <div className="text-xs text-slate-500 pt-2 space-y-1">
+            <div>{footerConfig.address}</div>
+            <div>{footerConfig.email} · {footerConfig.phone}</div>
           </div>
         </div>
 
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-white mb-3">Shop & Categories</div>
-          <ul className="space-y-2 text-xs">
-            <li>
-              <button onClick={() => onNavigate('shop')} className="hover:text-white transition-colors">
-                All Products
-              </button>
-            </li>
-            <li>
-              <button onClick={() => onNavigate('shop', 'wearables')} className="hover:text-white transition-colors">
-                Smart Wearables
-              </button>
-            </li>
-            <li>
-              <button onClick={() => onNavigate('shop', 'audio')} className="hover:text-white transition-colors">
-                Audio Hardware
-              </button>
-            </li>
-            <li>
-              <button onClick={() => onNavigate('shop', 'lifestyle')} className="hover:text-white transition-colors">
-                Bags & Lifestyle
-              </button>
-            </li>
-            <li>
-              <button onClick={() => onNavigate('track-order')} className="hover:text-white transition-colors">
-                Order Tracking
-              </button>
-            </li>
-          </ul>
-        </div>
+        {footerConfig.columns.map(col => (
+          <div key={col.id}>
+            <div className="text-xs font-semibold uppercase tracking-wider text-white mb-3">
+              {col.title}
+            </div>
+            <ul className="space-y-2 text-xs">
+              {col.links.map((link, idx) => (
+                <li key={idx}>
+                  <button
+                    type="button"
+                    onClick={() => handleLinkClick(link.url)}
+                    className="hover:text-white transition-colors text-left"
+                  >
+                    {link.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
 
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-white mb-3">Affiliate Partners</div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-white mb-3">Operations & Access</div>
           <ul className="space-y-2 text-xs">
             <li>
               <button
                 type="button"
-                onClick={() => onNavigate('affiliate-register')}
-                className="hover:text-white transition-colors text-left"
+                onClick={() => onNavigate('admin-portal')}
+                className="hover:text-white transition-colors"
               >
-                Join Affiliate Program
-              </button>
-            </li>
-            <li>
-              <button
-                type="button"
-                onClick={() => onNavigate('affiliate-status')}
-                className="hover:text-white transition-colors text-left"
-              >
-                Application Status
-              </button>
-            </li>
-            <li>
-              <button
-                type="button"
-                onClick={() => onNavigate('affiliate-dashboard')}
-                className="hover:text-white transition-colors text-left"
-              >
-                Partner Dashboard
-              </button>
-            </li>
-            <li>
-              <button
-                type="button"
-                onClick={() => onNavigate('affiliate-storefront', 'techdeals-bd')}
-                className="hover:text-white transition-colors text-left"
-              >
-                Sample Partner Storefront
-              </button>
-            </li>
-          </ul>
-        </div>
-
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-white mb-3">Administration & Quality</div>
-          <ul className="space-y-2 text-xs">
-            <li>
-              <button onClick={() => onNavigate('admin-portal')} className="hover:text-white transition-colors">
-                Admin Console
+                Operations Hub (Admin)
               </button>
             </li>
             {onOpenDiagnostics && (
               <li>
                 <button
+                  type="button"
                   onClick={onOpenDiagnostics}
                   className="text-amber-400 hover:text-amber-300 font-medium transition-colors flex items-center gap-1.5"
                 >
@@ -151,10 +147,10 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onOpenDiagnostics })
               </li>
             )}
             <li>
-              <span className="text-slate-500">Firebase Firestore: Connected</span>
+              <span className="text-slate-500">Firestore: Realtime Connected</span>
             </li>
             <li>
-              <span className="text-slate-500">Default Currency: BDT (৳)</span>
+              <span className="text-slate-500">Weekly Payouts: Every Wednesday</span>
             </li>
           </ul>
         </div>
@@ -163,7 +159,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onOpenDiagnostics })
       {/* Copyright Bar */}
       <div className="border-t border-slate-900 py-6 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div>© {new Date().getFullYear()} RONVEX Technologies Ltd. All rights reserved.</div>
+          <div>{footerConfig.copyrightText || `© ${new Date().getFullYear()} RONVEX Technologies Ltd. All rights reserved.`}</div>
           <div className="flex items-center gap-4">
             <span className="text-slate-600">Dhaka · Chattogram · Sylhet · Rajshahi · Khulna</span>
           </div>

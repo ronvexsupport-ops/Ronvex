@@ -56,7 +56,7 @@ export const AffiliateDashboardPage: React.FC<AffiliateDashboardPageProps> = ({
   products,
   onNavigate,
 }) => {
-  const { appUser, affiliateProfile, isAffiliate, isPendingAffiliate, loginAsDemoAffiliate } = useAuth();
+  const { appUser, affiliateProfile, isAffiliate, isPendingAffiliate } = useAuth();
 
   const [activeTab, setActiveTab] = useState<TabType>('overview');
 
@@ -467,29 +467,20 @@ export const AffiliateDashboardPage: React.FC<AffiliateDashboardPageProps> = ({
           </p>
         </div>
 
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-left text-xs space-y-2 text-amber-900">
-          <div className="font-bold flex items-center gap-1.5">
-            <Info className="w-4 h-4 text-amber-600" />
-            <span>Interactive Evaluation Shortcut</span>
-          </div>
-          <p>
-            If you want to immediately inspect and test the full 7-section Affiliate Portal with real-time data, you can switch to the verified Demo Partner account.
-          </p>
-        </div>
-
         <div className="flex flex-col sm:flex-row gap-3 pt-2">
           <button
-            onClick={() => loginAsDemoAffiliate()}
-            className="flex-1 py-2.5 px-4 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold transition-colors"
+            type="button"
+            onClick={() => onNavigate('affiliate-status')}
+            className="flex-1 py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold transition-colors"
           >
-            Switch to Demo Partner (Rahim Chowdhury)
+            Check Application Status
           </button>
           <button
             type="button"
             onClick={() => onNavigate('affiliate-register')}
             className="flex-1 py-2.5 px-4 bg-slate-950 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition-colors"
           >
-            Join Affiliate Program
+            Apply to Become an Affiliate
           </button>
         </div>
       </div>
