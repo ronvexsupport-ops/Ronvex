@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ShoppingBag, Search, User, ShieldCheck, TrendingUp, LogOut, CheckCircle, ChevronDown, Menu, X, ArrowRight } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useCms } from '../context/CmsContext';
 import { PricingEngine } from '../services/pricingEngine';
 
 interface NavbarProps {
@@ -13,6 +14,8 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, affiliateStorefrontSlug }) => {
   const { itemCount, setIsCartOpen, activeAttribution } = useCart();
   const { appUser, isAdmin, isAffiliate, logout, loginAsDemoAdmin, loginAsDemoAffiliate, isDemoMode } = useAuth();
+  const { cms } = useCms();
+  const headerCMS = cms?.header;
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
@@ -21,16 +24,22 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, affilia
     onNavigate(view, param);
   };
 
+  const logoText = headerCMS?.logoText || 'RONVEX';
+
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
       {/* Top Banner for Affiliate Storefront or Global Announcement */}
-      {affiliateStorefrontSlug && (
+      {affiliateStorefrontSlug ? (
         <div className="bg-slate-900 text-white text-xs py-1.5 px-4 text-center">
           <span className="font-medium">Special Partner Storefront</span>
           <span className="mx-2 text-slate-400">·</span>
           <span>Curated pricing & exclusive verified deals through RONVEX</span>
         </div>
-      )}
+      ) : headerCMS?.announcementBarEnabled && headerCMS?.announcementText ? (
+        <div className="bg-slate-900 text-white text-xs py-1.5 px-4 text-center">
+          <span>{headerCMS.announcementText}</span>
+        </div>
+      ) : null}
 
       {/* Strict 3-Zone Header Contract */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4 sm:gap-8">
@@ -41,7 +50,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, affilia
             onClick={() => onNavigate('home')}
             className="text-xl font-extrabold tracking-tight text-slate-950 font-serif hover:opacity-85 transition-opacity text-left"
           >
-            RONVEX
+            {logoText}
           </button>
           {activeAttribution && !affiliateStorefrontSlug && (
             <span className="hidden sm:inline-block text-[11px] text-slate-500 font-mono tracking-tight bg-slate-100 px-2 py-0.5 rounded">

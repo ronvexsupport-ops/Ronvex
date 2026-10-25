@@ -45,8 +45,10 @@ service cloud.firestore {
         request.resource.data.role in ['affiliate', 'customer'] &&
         request.resource.data.accountStatus in ['pending', 'active'];
       allow update: if isSignedIn() && (
-        (request.auth.uid == userId &&
-         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'accountStatus', 'uid', 'createdAt'])) ||
+        (request.auth.uid == userId && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'accountStatus', 'uid', 'createdAt']) ||
+          (request.resource.data.role == 'affiliate' && request.resource.data.accountStatus == 'pending')
+        )) ||
         isAdmin()
       );
       allow delete: if isAdmin();
@@ -54,6 +56,12 @@ service cloud.firestore {
 
     // Platform Settings
     match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Website CMS & Content
+    match /cms/{docId} {
       allow read: if true;
       allow write: if isAdmin();
     }
@@ -66,11 +74,14 @@ service cloud.firestore {
 
     // Affiliate Applications
     match /affiliateApplications/{applicationId} {
-      allow get: if isValidId(applicationId) && isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow get: if isValidId(applicationId) && (isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid));
       allow list: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
-      allow create: if isValidId(applicationId) && isSignedIn() &&
-        request.resource.data.uid == request.auth.uid &&
-        request.resource.data.applicationStatus == 'PENDING';
+      allow create: if isValidId(applicationId) && (
+        isAdmin() ||
+        (isSignedIn() &&
+          (request.resource.data.uid == request.auth.uid || applicationId == ('app_' + request.auth.uid)) &&
+          request.resource.data.applicationStatus == 'PENDING')
+      );
       allow update: if isValidId(applicationId) && isAdmin();
       allow delete: if isValidId(applicationId) && isAdmin();
     }
@@ -93,9 +104,9 @@ service cloud.firestore {
       allow create, update: if isValidId(priceId) && (
         isAdmin() ||
         (isSignedIn() &&
-         (request.resource.data.affiliateId == request.auth.uid ||
-          (exists(/databases/$(database)/documents/affiliates/$(request.resource.data.affiliateId)) &&
-           get(/databases/$(database)/documents/affiliates/$(request.resource.data.affiliateId)).data.uid == request.auth.uid)))
+          (request.resource.data.affiliateId == request.auth.uid ||
+           (exists(/databases/$(database)/documents/affiliates/$(request.resource.data.affiliateId)) &&
+            get(/databases/$(database)/documents/affiliates/$(request.resource.data.affiliateId)).data.uid == request.auth.uid)))
       );
       allow delete: if isValidId(priceId) && (isAdmin() || (isSignedIn() && resource.data.affiliateId == request.auth.uid));
     }
@@ -156,10 +167,23 @@ service cloud.firestore {
       allow delete: if isValidId(payoutId) && isAdmin();
     }
 
+    // Coupons & Promotions
+    match /coupons/{couponId} {
+      allow read: if isValidId(couponId);
+      allow write: if isValidId(couponId) && isAdmin();
+    }
+
+    // Contact Messages
+    match /contactMessages/{messageId} {
+      allow read: if isValidId(messageId) && isAdmin();
+      allow create: if isValidId(messageId);
+      allow update, delete: if isValidId(messageId) && isAdmin();
+    }
+
     // Audit Logs
     match /auditLogs/{logId} {
       allow read: if isValidId(logId) && isAdmin();
-      allow create: if isValidId(logId) && isSignedIn();
+      allow create: if isValidId(logId) && (isAdmin() || isSignedIn());
       allow update, delete: if false;
     }
   }

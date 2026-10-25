@@ -48,9 +48,15 @@ export const AffiliateRegisterPage: React.FC<AffiliateRegisterPageProps> = ({ on
       let uid = currentUser?.uid;
 
       if (!uid) {
-        // Register user account via Firebase auth
-        await registerWithEmail(email.trim(), password, fullName.trim());
-        uid = `aff_app_${Date.now()}`;
+        // Register user account via Firebase auth with affiliate role & pending status
+        const newUser = await registerWithEmail(
+          email.trim(),
+          password,
+          fullName.trim(),
+          'affiliate',
+          'pending'
+        );
+        uid = newUser.uid;
       }
 
       const application = await AffiliateService.submitApplication({
