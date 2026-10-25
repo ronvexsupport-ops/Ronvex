@@ -1,16 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import { Search, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
-import { Product } from '../types';
+import { Product, ProductCategory } from '../types';
 import { ProductCard } from '../components/ProductCard';
 
 interface ShopPageProps {
   products: Product[];
+  categories?: ProductCategory[];
   initialCategory?: string;
   onSelectProduct: (product: Product) => void;
 }
 
 export const ShopPage: React.FC<ShopPageProps> = ({
   products,
+  categories: categoriesProp,
   initialCategory,
   onSelectProduct,
 }) => {
@@ -18,20 +20,50 @@ export const ShopPage: React.FC<ShopPageProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<'featured' | 'price-asc' | 'price-desc' | 'newest'>('featured');
 
-  const categories = [
-    { id: 'all', name: 'All Collections' },
-    { id: 'wearables', name: 'Smart Wearables' },
-    { id: 'audio', name: 'Audio Hardware' },
-    { id: 'lifestyle', name: 'Bags & Lifestyle' },
-    { id: 'watches', name: 'Accessories' },
-  ];
+  // Compute dynamic category list combining defined categories and product-assigned categories
+  const categoryTabs = useMemo(() => {
+    const list: Array<{ id: string; name: string }> = [{ id: 'all', name: 'All Collections' }];
+    const seen = new Set<string>(['all']);
+
+    // 1. From Firestore / passed categories
+    if (categoriesProp && categoriesProp.length > 0) {
+      categoriesProp
+        .filter(c => c.isActive !== false)
+        .forEach(c => {
+          const key = c.categoryId.toLowerCase();
+          if (!seen.has(key)) {
+            seen.add(key);
+            list.push({ id: c.categoryId, name: c.name });
+          }
+        });
+    }
+
+    // 2. From currently loaded products (ensures no product category is ever missing)
+    products.forEach(p => {
+      const catId = (p.categoryId || '').toLowerCase();
+      if (catId && !seen.has(catId)) {
+        seen.add(catId);
+        list.push({ id: p.categoryId, name: p.categoryName || p.categoryId });
+      }
+    });
+
+    return list;
+  }, [categoriesProp, products]);
 
   const filteredProducts = useMemo(() => {
     return products
       .filter(p => p.isActive)
       .filter(p => {
-        if (selectedCategory !== 'all' && p.categoryId !== selectedCategory) {
-          return false;
+        if (selectedCategory !== 'all') {
+          const sel = selectedCategory.toLowerCase();
+          const pCatId = (p.categoryId || '').toLowerCase();
+          const pCatName = (p.categoryName || '').toLowerCase();
+          const pCatSlug = pCatName.replace(/[^a-z0-9_-]+/g, '-');
+
+          const matches = pCatId === sel || pCatName === sel || pCatSlug === sel;
+          if (!matches) {
+            return false;
+          }
         }
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
@@ -76,9 +108,9 @@ export const ShopPage: React.FC<ShopPageProps> = ({
 
       {/* Filter and Sort Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        {/* Interactive Segmented Filter Tabs */}
-        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
-          {categories.map(cat => (
+        {/* Dynamic Category Filter Tabs */}
+        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-xl max-w-full overflow-x-auto">
+          {categoryTabs.map(cat => (
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}

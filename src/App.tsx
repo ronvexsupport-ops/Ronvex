@@ -3,8 +3,9 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db, testFirestoreConnection } from './services/firebase';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider, useCart } from './context/CartContext';
-import { Product, Order } from './types';
+import { Product, ProductCategory, Order } from './types';
 import { bootstrapDatabase, INITIAL_PRODUCTS } from './services/seedData';
+import { CategoryService, DEFAULT_CATEGORIES } from './services/categoryService';
 import { AttributionEngine } from './services/pricingEngine';
 
 import { Navbar } from './components/Navbar';
@@ -35,15 +36,22 @@ function AppContent() {
   const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null);
 
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
+  const [categories, setCategories] = useState<ProductCategory[]>(DEFAULT_CATEGORIES);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
 
-  // Initialize and load products from Firestore
+  // Initialize and load products & categories from Firestore
   const loadCatalog = async () => {
     try {
       await bootstrapDatabase();
-      const snap = await getDocs(collection(db, 'products'));
-      if (!snap.empty) {
-        setProducts(snap.docs.map(d => d.data() as Product));
+      const [prodSnap, catList] = await Promise.all([
+        getDocs(collection(db, 'products')),
+        CategoryService.getCategories(),
+      ]);
+      if (!prodSnap.empty) {
+        setProducts(prodSnap.docs.map(d => d.data() as Product));
+      }
+      if (catList && catList.length > 0) {
+        setCategories(catList);
       }
     } catch (err) {
       console.warn('Catalog load fallback to initial seed:', err);
@@ -194,6 +202,7 @@ function AppContent() {
         {currentView === 'shop' && (
           <ShopPage
             products={products}
+            categories={categories}
             initialCategory={viewParam}
             onSelectProduct={handleSelectProduct}
           />

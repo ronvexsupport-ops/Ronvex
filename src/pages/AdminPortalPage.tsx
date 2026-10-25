@@ -11,6 +11,7 @@ import {
   Trash2,
   CheckCircle2,
   XCircle,
+  X,
   Truck,
   RotateCcw,
   Search,
@@ -190,6 +191,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
   const [prodMaxIncrease, setProdMaxIncrease] = useState<number>(150);
   const [prodStock, setProdStock] = useState<number>(50);
   const [prodImageUrl, setProdImageUrl] = useState('');
+  const [prodAdditionalImages, setProdAdditionalImages] = useState<string[]>([]);
 
   // Category Add / Edit Modal State
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -431,12 +433,15 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     };
 
     try {
-      await CategoryService.saveCategory(payload, adminEmail, adminUid);
+      const updated = await CategoryService.saveCategory(payload, adminEmail, adminUid);
       await CMSService.logActivity(adminUid, adminEmail, 'SAVE_CATEGORY', 'Categories', `Saved category: ${payload.name}`);
       setShowCategoryModal(false);
       setActionSuccess(`Category "${payload.name}" saved successfully.`);
-      const updated = await CategoryService.getCategories();
       setCategories(updated);
+      // Auto-assign to product creator modal if open
+      setProdCategory(payload.categoryId);
+      setProdCategoryName(payload.name);
+      onRefreshProducts();
     } catch (err: any) {
       setActionError(err.message || 'Failed to save category.');
     }
@@ -445,11 +450,11 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
   const handleDeleteCategory = async (categoryId: string) => {
     if (!confirm('Are you sure you want to delete this category?')) return;
     try {
-      await CategoryService.deleteCategory(categoryId, adminEmail, adminUid);
+      const updated = await CategoryService.deleteCategory(categoryId, adminEmail, adminUid);
       await CMSService.logActivity(adminUid, adminEmail, 'DELETE_CATEGORY', 'Categories', `Deleted category ID: ${categoryId}`);
       setActionSuccess('Category removed successfully.');
-      const updated = await CategoryService.getCategories();
       setCategories(updated);
+      onRefreshProducts();
     } catch (err: any) {
       setActionError(err.message || 'Failed to delete category.');
     }
@@ -468,6 +473,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     setProdMaxIncrease(150);
     setProdStock(50);
     setProdImageUrl(BUNDLED_IMAGES.smartwatch);
+    setProdAdditionalImages([]);
     setShowProductModal(true);
   };
 
@@ -481,7 +487,9 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     setProdBasePrice(p.adminBasePrice);
     setProdMaxIncrease(p.maxAffiliateIncrease);
     setProdStock(p.stockQuantity);
-    setProdImageUrl(p.imageUrls?.[0] || DEFAULT_FALLBACK_IMAGE);
+    const [firstImg, ...restImgs] = p.imageUrls || [];
+    setProdImageUrl(firstImg || DEFAULT_FALLBACK_IMAGE);
+    setProdAdditionalImages(restImgs || []);
     setShowProductModal(true);
   };
 
@@ -491,9 +499,25 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     try {
       const dataUrl = await ImageService.uploadImage(file);
       setProdImageUrl(dataUrl);
-      setActionSuccess('Custom image loaded successfully!');
+      setActionSuccess('Main product image loaded successfully!');
     } catch (err: any) {
       setActionError(err.message || 'Failed to read image file.');
+    }
+  };
+
+  const handleAdditionalImagesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    try {
+      const newUrls: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const url = await ImageService.uploadImage(files[i]);
+        newUrls.push(url);
+      }
+      setProdAdditionalImages(prev => [...prev, ...newUrls]);
+      setActionSuccess(`Added ${newUrls.length} gallery photo(s)!`);
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to read image files.');
     }
   };
 
@@ -511,8 +535,13 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     const foundCat = categories.find(c => c.categoryId === prodCategory);
     const categoryName = foundCat ? foundCat.name : prodCategoryName;
 
-    // Resolve image URL
+    // Resolve main and additional image URLs
     const finalImageUrl = ImageService.resolveProductImage(prodImageUrl.trim(), prodCategory);
+    const resolvedAdditional = prodAdditionalImages
+      .map(u => ImageService.resolveProductImage(u.trim(), prodCategory))
+      .filter(u => u && u.trim().length > 0);
+
+    const combinedImages = Array.from(new Set([finalImageUrl, ...resolvedAdditional]));
 
     const productPayload: Product = {
       productId,
@@ -524,7 +553,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
       adminBasePrice: Number(prodBasePrice),
       maxAffiliateIncrease: Number(prodMaxIncrease),
       stockQuantity: Number(prodStock),
-      imageUrls: [finalImageUrl],
+      imageUrls: combinedImages,
       isActive: editingProduct ? editingProduct.isActive : true,
       createdAt: editingProduct ? editingProduct.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -2851,44 +2880,132 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                 </div>
               </div>
 
-              {/* Product Image Section with Live Preview, Presets, and File Upload */}
-              <div className="p-4 bg-slate-900/80 border border-slate-800 rounded-xl space-y-3">
-                <label className="block text-xs font-semibold text-slate-300">Product Photography & Visual Asset</label>
+              {/* Product Image Section with Multi-Photo Gallery, Presets, and File Upload */}
+              <div className="p-4 bg-slate-900/80 border border-slate-800 rounded-xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-300">
+                    Product Photography & Multi-Angle Gallery
+                  </label>
+                  <span className="text-[11px] text-slate-400">
+                    {1 + prodAdditionalImages.length} photo(s) total
+                  </span>
+                </div>
 
-                <div className="flex gap-4 items-start">
-                  <div className="w-20 h-20 rounded-xl bg-slate-950 border border-slate-800 overflow-hidden shrink-0 flex items-center justify-center">
-                    <img
-                      src={ImageService.resolveProductImage(prodImageUrl, prodCategory)}
-                      alt="Preview"
-                      className="w-full h-full object-cover"
-                      onError={e => {
-                        (e.target as HTMLImageElement).src = DEFAULT_FALLBACK_IMAGE;
-                      }}
-                    />
+                {/* Primary Image */}
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-medium text-slate-400">Primary / Cover Photo *</span>
+                  <div className="flex gap-4 items-start">
+                    <div className="w-20 h-24 rounded-xl bg-slate-950 border border-slate-800 overflow-hidden shrink-0 flex items-center justify-center p-1">
+                      <img
+                        src={ImageService.resolveProductImage(prodImageUrl, prodCategory)}
+                        alt="Preview"
+                        className="w-full h-full object-contain"
+                        onError={e => {
+                          (e.target as HTMLImageElement).src = DEFAULT_FALLBACK_IMAGE;
+                        }}
+                      />
+                    </div>
+
+                    <div className="flex-1 space-y-2">
+                      <input
+                        type="text"
+                        value={prodImageUrl}
+                        onChange={e => setProdImageUrl(e.target.value)}
+                        placeholder="Paste main image URL (https://... or preset)"
+                        className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white font-mono"
+                      />
+
+                      <div className="flex items-center gap-2">
+                        <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg transition-colors">
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Upload Cover</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleProductImageUpload}
+                          />
+                        </label>
+                        <span className="text-[11px] text-slate-500">JPG, PNG, WEBP</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Additional Gallery Photos */}
+                <div className="space-y-2 pt-2 border-t border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-slate-400">Additional Gallery Photos (Angles & Details)</span>
+                    <label className="cursor-pointer text-[11px] text-emerald-400 hover:underline inline-flex items-center gap-1">
+                      <Upload className="w-3 h-3" />
+                      <span>+ Upload Photos</span>
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleAdditionalImagesUpload}
+                      />
+                    </label>
                   </div>
 
-                  <div className="flex-1 space-y-2">
+                  {/* Thumbnail Row of Additional Photos */}
+                  {prodAdditionalImages.length > 0 && (
+                    <div className="flex flex-wrap gap-2 py-1">
+                      {prodAdditionalImages.map((extraUrl, idx) => (
+                        <div
+                          key={idx}
+                          className="relative w-16 h-20 rounded-lg bg-slate-950 border border-slate-800 overflow-hidden group/img flex items-center justify-center p-0.5"
+                        >
+                          <img
+                            src={ImageService.resolveProductImage(extraUrl, prodCategory)}
+                            alt=""
+                            className="w-full h-full object-contain"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setProdAdditionalImages(prev => prev.filter((_, i) => i !== idx))}
+                            className="absolute top-1 right-1 p-0.5 bg-rose-600 hover:bg-rose-500 text-white rounded-full opacity-80 group-hover/img:opacity-100 transition-opacity"
+                            title="Remove Photo"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Quick URL adder for extra photo */}
+                  <div className="flex gap-2">
                     <input
                       type="text"
-                      value={prodImageUrl}
-                      onChange={e => setProdImageUrl(e.target.value)}
-                      placeholder="Paste image URL (https://... or preset)"
-                      className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white font-mono"
+                      id="additionalPhotoUrlInput"
+                      placeholder="Add another image URL (https://...)"
+                      className="flex-1 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white font-mono"
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const val = (e.currentTarget.value || '').trim();
+                          if (val) {
+                            setProdAdditionalImages(prev => [...prev, val]);
+                            e.currentTarget.value = '';
+                          }
+                        }
+                      }}
                     />
-
-                    <div className="flex items-center gap-2">
-                      <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg transition-colors">
-                        <Upload className="w-3.5 h-3.5" />
-                        <span>Upload Local File</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleProductImageUpload}
-                        />
-                      </label>
-                      <span className="text-[11px] text-slate-500">Supports JPG, PNG, WEBP</span>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const input = document.getElementById('additionalPhotoUrlInput') as HTMLInputElement | null;
+                        if (input && input.value.trim()) {
+                          setProdAdditionalImages(prev => [...prev, input.value.trim()]);
+                          input.value = '';
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg"
+                    >
+                      + Add
+                    </button>
                   </div>
                 </div>
 
@@ -2948,9 +3065,9 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
         </div>
       )}
 
-      {/* Category Add / Edit Modal */}
+      {/* Category Add / Edit Modal (z-[70] so it sits above product modal) */}
       {showCategoryModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+        <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
           <div className="w-full max-w-md bg-slate-950 border border-slate-800 rounded-2xl p-6 shadow-2xl relative">
             <h3 className="text-base font-bold text-white mb-3">
               {editingCategory ? 'Edit Product Category' : 'Add New Product Category'}

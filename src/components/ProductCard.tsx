@@ -23,17 +23,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const imageUrl = ImageService.resolveProductImage(product.imageUrls?.[0], product.categoryId);
 
   return (
-    <div className="group flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden hover:border-slate-300 transition-all duration-200">
-      {/* Product Image Frame (65-75% height focus) */}
+    <div className="group flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden hover:border-slate-300 hover:shadow-md transition-all duration-200">
+      {/* Product Image Frame (Full Image Visibility, 3:4 portrait) */}
       <div
         onClick={() => onSelect(product)}
-        className="relative aspect-4/3 w-full bg-slate-100 overflow-hidden cursor-pointer"
+        className="relative aspect-3/4 w-full bg-slate-50/90 overflow-hidden cursor-pointer flex items-center justify-center p-2"
       >
         <img
           src={imageUrl}
           alt={product.name}
           referrerPolicy="no-referrer"
-          className="w-full h-full object-cover object-center group-hover:scale-[1.02] transition-transform duration-300"
+          className="w-full h-full object-contain object-center group-hover:scale-[1.03] transition-transform duration-300"
           onError={(e) => {
             (e.target as HTMLImageElement).src = ImageService.getCategoryFallback(product.categoryId);
           }}
@@ -41,6 +41,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         {product.stockQuantity <= 5 && product.stockQuantity > 0 && (
           <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm text-[11px] font-medium text-amber-700 px-2 py-0.5 rounded shadow-sm">
             Only {product.stockQuantity} remaining
+          </div>
+        )}
+        {product.imageUrls && product.imageUrls.length > 1 && (
+          <div className="absolute bottom-2.5 right-2.5 bg-black/60 backdrop-blur-xs text-white text-[10px] font-medium px-1.5 py-0.5 rounded-md flex items-center gap-1">
+            <span>+{product.imageUrls.length} photos</span>
           </div>
         )}
       </div>
