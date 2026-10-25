@@ -22,13 +22,7 @@ interface AuthContextType {
   isPendingAffiliate: boolean;
   signInWithGoogle: () => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
-  registerWithEmail: (
-    email: string,
-    pass: string,
-    displayName: string,
-    initialRole?: UserRole,
-    initialStatus?: AccountStatus
-  ) => Promise<FirebaseUser>;
+  registerWithEmail: (email: string, pass: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
   loginAsDemoAdmin: () => void;
   loginAsDemoAffiliate: () => void;
@@ -114,24 +108,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await signInWithEmailAndPassword(auth, email, pass);
   };
 
-  const registerWithEmail = async (
-    email: string,
-    pass: string,
-    displayName: string,
-    initialRole: UserRole = 'customer',
-    initialStatus: AccountStatus = 'active'
-  ): Promise<FirebaseUser> => {
+  const registerWithEmail = async (email: string, pass: string, displayName: string) => {
     setIsDemoMode(false);
     const cred = await createUserWithEmailAndPassword(auth, email, pass);
     await setDoc(doc(db, 'users', cred.user.uid), {
       uid: cred.user.uid,
-      email: cred.user.email || email,
+      email: cred.user.email,
       displayName,
-      role: initialRole,
-      accountStatus: initialStatus,
+      role: 'customer',
+      accountStatus: 'active',
       createdAt: new Date().toISOString(),
     });
-    return cred.user;
   };
 
   const logout = async () => {

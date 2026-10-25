@@ -46,13 +46,8 @@ export class AffiliateService {
 
     try {
       await setDoc(doc(db, 'affiliateApplications', applicationId), application);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, `affiliateApplications/${applicationId}`);
-      throw error;
-    }
 
-    // Secondary sync for user profile (non-fatal so applicant does not get blocked)
-    try {
+      // Update user account status
       await setDoc(
         doc(db, 'users', params.uid),
         {
@@ -66,11 +61,11 @@ export class AffiliateService {
         },
         { merge: true }
       );
-    } catch (userSyncError) {
-      console.warn('Note: User profile role sync was bypassed or already configured:', userSyncError);
-    }
 
-    return application;
+      return application;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `affiliateApplications/${applicationId}`);
+    }
   }
 
   /**
