@@ -45,6 +45,8 @@ import {
   ShieldAlert,
   ChevronRight,
   Send,
+  FolderPlus,
+  Sparkles,
 } from 'lucide-react';
 import {
   collection,
@@ -57,6 +59,7 @@ import {
 import { db } from '../services/firebase';
 import {
   Product,
+  ProductCategory,
   Order,
   AffiliateApplication,
   Affiliate,
@@ -82,7 +85,13 @@ import { PricingEngine, DEFAULT_PLATFORM_SETTINGS } from '../services/pricingEng
 import { OrderService } from '../services/orderService';
 import { AffiliateService } from '../services/affiliateService';
 import { PayoutService } from '../services/payoutService';
-import { ImageService, DEFAULT_FALLBACK_IMAGE } from '../services/imageService';
+import {
+  ImageService,
+  DEFAULT_FALLBACK_IMAGE,
+  PRODUCT_IMAGE_PRESETS,
+  BUNDLED_IMAGES,
+} from '../services/imageService';
+import { CategoryService, DEFAULT_CATEGORIES } from '../services/categoryService';
 import {
   CMSService,
   DEFAULT_HOMEPAGE_CMS,
@@ -130,7 +139,7 @@ export type AdminTab =
   | 'general_settings';
 
 export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
-  products,
+  products: initialProducts,
   onRefreshProducts,
   onOpenDiagnostics,
   onNavigateHome = () => { window.location.hash = ''; },
@@ -140,6 +149,8 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
 
   // Core Data Collections
+  const [productList, setProductList] = useState<Product[]>(initialProducts);
+  const [categories, setCategories] = useState<ProductCategory[]>(DEFAULT_CATEGORIES);
   const [orders, setOrders] = useState<Order[]>([]);
   const [applications, setApplications] = useState<AffiliateApplication[]>([]);
   const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
@@ -167,7 +178,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Modals & Sub-forms
+  // Product Add / Edit Modal State
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [prodName, setProdName] = useState('');
@@ -180,7 +191,15 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
   const [prodStock, setProdStock] = useState<number>(50);
   const [prodImageUrl, setProdImageUrl] = useState('');
 
-  // Page Editor Modal
+  // Category Add / Edit Modal State
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<ProductCategory | null>(null);
+  const [catName, setCatName] = useState('');
+  const [catSlug, setCatSlug] = useState('');
+  const [catDesc, setCatDesc] = useState('');
+  const [catIsActive, setCatIsActive] = useState(true);
+
+  // Page Editor Modal State
   const [showPageModal, setShowPageModal] = useState(false);
   const [editingPage, setEditingPage] = useState<CustomPage | null>(null);
   const [pageTitle, setPageTitle] = useState('');
@@ -201,12 +220,6 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
   const [mediaTitle, setMediaTitle] = useState('');
   const [mediaUrl, setMediaUrl] = useState('');
   const [mediaCategory, setMediaCategory] = useState<'banner' | 'product' | 'logo' | 'marketing' | 'other'>('product');
-
-  // New Admin Modal
-  const [showAdminModal, setShowAdminModal] = useState(false);
-  const [newAdminEmail, setNewAdminEmail] = useState('');
-  const [newAdminName, setNewAdminName] = useState('');
-  const [newAdminRole, setNewAdminRole] = useState<AdminRole>('content_editor');
 
   // Order Transition Modal
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -232,15 +245,24 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
   const adminEmail = currentUser?.email || 'ronvex.support@gmail.com';
   const adminUid = currentUser?.uid || 'admin_user';
 
+  // Keep productList in sync with incoming props
+  useEffect(() => {
+    if (initialProducts && initialProducts.length > 0) {
+      setProductList(initialProducts);
+    }
+  }, [initialProducts]);
+
   const fetchAllData = async () => {
     setLoading(true);
     try {
       const [
+        prodSnap,
         orderSnap,
         appSnap,
         affSnap,
         payoutSnap,
         commSnap,
+        loadedCats,
         hpCMS,
         header,
         footer,
@@ -253,11 +275,13 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
         admins,
         logs,
       ] = await Promise.all([
+        getDocs(collection(db, 'products')),
         getDocs(collection(db, 'orders')),
         getDocs(collection(db, 'affiliateApplications')),
         getDocs(collection(db, 'affiliates')),
         getDocs(collection(db, 'payouts')),
         getDocs(collection(db, 'commissions')),
+        CategoryService.getCategories(),
         CMSService.getHomepageConfig(),
         CMSService.getHeaderConfig(),
         CMSService.getFooterConfig(),
@@ -271,11 +295,15 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
         CMSService.getActivityLogs(50),
       ]);
 
+      if (!prodSnap.empty) {
+        setProductList(prodSnap.docs.map(d => d.data() as Product));
+      }
       setOrders(orderSnap.docs.map(d => d.data() as Order));
       setApplications(appSnap.docs.map(d => d.data() as AffiliateApplication));
       setAffiliates(affSnap.docs.map(d => d.data() as Affiliate));
       setPayouts(payoutSnap.docs.map(d => d.data() as Payout));
       setCommissions(commSnap.docs.map(d => d.data() as Commission));
+      setCategories(loadedCats);
       setHomepageCMS(hpCMS);
       setHeaderConfig(header);
       setFooterConfig(footer);
@@ -366,13 +394,201 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     );
   }
 
-  // ---------------- Handlers for CMS & Site Operations ----------------
+  // ---------------- CATEGORY HANDLERS ----------------
+  const openAddCategoryModal = () => {
+    setEditingCategory(null);
+    setCatName('');
+    setCatSlug('');
+    setCatDesc('');
+    setCatIsActive(true);
+    setShowCategoryModal(true);
+  };
+
+  const openEditCategoryModal = (cat: ProductCategory) => {
+    setEditingCategory(cat);
+    setCatName(cat.name);
+    setCatSlug(cat.slug);
+    setCatDesc(cat.description);
+    setCatIsActive(cat.isActive);
+    setShowCategoryModal(true);
+  };
+
+  const handleSaveCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!catName.trim()) {
+      setActionError('Category name is required.');
+      return;
+    }
+    const slug = catSlug.trim() || catName.toLowerCase().replace(/[^a-z0-9_-]+/g, '-');
+    const payload: ProductCategory = {
+      categoryId: slug,
+      name: catName.trim(),
+      slug,
+      description: catDesc.trim(),
+      isActive: catIsActive,
+      createdAt: editingCategory ? editingCategory.createdAt : new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    try {
+      await CategoryService.saveCategory(payload, adminEmail, adminUid);
+      await CMSService.logActivity(adminUid, adminEmail, 'SAVE_CATEGORY', 'Categories', `Saved category: ${payload.name}`);
+      setShowCategoryModal(false);
+      setActionSuccess(`Category "${payload.name}" saved successfully.`);
+      const updated = await CategoryService.getCategories();
+      setCategories(updated);
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to save category.');
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId: string) => {
+    if (!confirm('Are you sure you want to delete this category?')) return;
+    try {
+      await CategoryService.deleteCategory(categoryId, adminEmail, adminUid);
+      await CMSService.logActivity(adminUid, adminEmail, 'DELETE_CATEGORY', 'Categories', `Deleted category ID: ${categoryId}`);
+      setActionSuccess('Category removed successfully.');
+      const updated = await CategoryService.getCategories();
+      setCategories(updated);
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to delete category.');
+    }
+  };
+
+  // ---------------- PRODUCT HANDLERS ----------------
+  const openAddProductModal = () => {
+    setEditingProduct(null);
+    setProdName('');
+    setProdSlug('');
+    setProdDesc('');
+    const defaultCat = categories[0] || { categoryId: 'wearables', name: 'Smart Wearables' };
+    setProdCategory(defaultCat.categoryId);
+    setProdCategoryName(defaultCat.name);
+    setProdBasePrice(600);
+    setProdMaxIncrease(150);
+    setProdStock(50);
+    setProdImageUrl(BUNDLED_IMAGES.smartwatch);
+    setShowProductModal(true);
+  };
+
+  const openEditProductModal = (p: Product) => {
+    setEditingProduct(p);
+    setProdName(p.name);
+    setProdSlug(p.slug);
+    setProdDesc(p.description);
+    setProdCategory(p.categoryId);
+    setProdCategoryName(p.categoryName);
+    setProdBasePrice(p.adminBasePrice);
+    setProdMaxIncrease(p.maxAffiliateIncrease);
+    setProdStock(p.stockQuantity);
+    setProdImageUrl(p.imageUrls?.[0] || DEFAULT_FALLBACK_IMAGE);
+    setShowProductModal(true);
+  };
+
+  const handleProductImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const dataUrl = await ImageService.uploadImage(file);
+      setProdImageUrl(dataUrl);
+      setActionSuccess('Custom image loaded successfully!');
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to read image file.');
+    }
+  };
+
+  const handleSaveProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!prodName.trim()) {
+      setActionError('Product name is required.');
+      return;
+    }
+
+    const productId = editingProduct ? editingProduct.productId : `prod_${Date.now()}`;
+    const cleanSlug = prodSlug.trim() || prodName.toLowerCase().replace(/[^a-z0-9_-]+/g, '-');
+
+    // Find category name
+    const foundCat = categories.find(c => c.categoryId === prodCategory);
+    const categoryName = foundCat ? foundCat.name : prodCategoryName;
+
+    // Resolve image URL
+    const finalImageUrl = ImageService.resolveProductImage(prodImageUrl.trim(), prodCategory);
+
+    const productPayload: Product = {
+      productId,
+      name: prodName.trim(),
+      slug: cleanSlug,
+      description: prodDesc.trim(),
+      categoryId: prodCategory,
+      categoryName,
+      adminBasePrice: Number(prodBasePrice),
+      maxAffiliateIncrease: Number(prodMaxIncrease),
+      stockQuantity: Number(prodStock),
+      imageUrls: [finalImageUrl],
+      isActive: editingProduct ? editingProduct.isActive : true,
+      createdAt: editingProduct ? editingProduct.createdAt : new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    try {
+      await setDoc(doc(db, 'products', productId), productPayload);
+      await CMSService.logActivity(adminUid, adminEmail, 'SAVE_PRODUCT', 'Products', `Saved product: ${prodName}`);
+
+      // Immediately update local product list
+      setProductList(prev => {
+        const idx = prev.findIndex(p => p.productId === productId);
+        if (idx >= 0) {
+          const updated = [...prev];
+          updated[idx] = productPayload;
+          return updated;
+        }
+        return [productPayload, ...prev];
+      });
+
+      setShowProductModal(false);
+      setActionSuccess(`Product "${prodName}" saved successfully.`);
+      onRefreshProducts();
+      fetchAllData();
+    } catch (err: any) {
+      console.error('Product save error:', err);
+      setActionError(err.message || 'Failed to save product in Firestore.');
+    }
+  };
+
+  const handleToggleProductActive = async (p: Product) => {
+    try {
+      await updateDoc(doc(db, 'products', p.productId), {
+        isActive: !p.isActive,
+        updatedAt: new Date().toISOString(),
+      });
+      await CMSService.logActivity(adminUid, adminEmail, 'TOGGLE_PRODUCT', 'Products', `Toggled ${p.name}`);
+      setProductList(prev => prev.map(prod => prod.productId === p.productId ? { ...prod, isActive: !prod.isActive } : prod));
+      onRefreshProducts();
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to update product state');
+    }
+  };
+
+  const handleDeleteProduct = async (p: Product) => {
+    if (!confirm(`Are you sure you want to delete "${p.name}"?`)) return;
+    try {
+      await deleteDoc(doc(db, 'products', p.productId));
+      await CMSService.logActivity(adminUid, adminEmail, 'DELETE_PRODUCT', 'Products', `Deleted ${p.name}`);
+      setProductList(prev => prev.filter(prod => prod.productId !== p.productId));
+      setActionSuccess(`Product "${p.name}" deleted.`);
+      onRefreshProducts();
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to delete product');
+    }
+  };
+
+  // ---------------- OTHER CMS HANDLERS ----------------
   const handleSaveHomepageCMS = async () => {
     setSavingCMS(true);
     setActionError(null);
     try {
       await CMSService.saveHomepageConfig(homepageCMS, adminEmail, adminUid);
-      setActionSuccess('Homepage CMS published successfully! Frontend reflects the changes immediately.');
+      setActionSuccess('Homepage CMS published successfully! Frontend reflects changes immediately.');
     } catch (err: any) {
       setActionError(err.message || 'Failed to save homepage CMS.');
     } finally {
@@ -428,11 +644,10 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     }
   };
 
-  // Page Editor
   const handleSavePage = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const cleanSlug = pageSlug.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-');
+      const cleanSlug = pageSlug.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-');
       const payload: CustomPage = {
         pageId: cleanSlug,
         slug: cleanSlug,
@@ -454,7 +669,6 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     }
   };
 
-  // Coupon Save
   const handleSaveCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -480,7 +694,6 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     }
   };
 
-  // Media Asset Save
   const handleSaveMediaAsset = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -503,59 +716,9 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     }
   };
 
-  // Product Handlers
-  const handleSaveProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const productId = editingProduct ? editingProduct.productId : `prod_${Date.now()}`;
-    const cleanSlug = prodSlug.trim() || prodName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-
-    const productPayload: Product = {
-      productId,
-      name: prodName.trim(),
-      slug: cleanSlug,
-      description: prodDesc.trim(),
-      categoryId: prodCategory,
-      categoryName: prodCategoryName,
-      adminBasePrice: Number(prodBasePrice),
-      maxAffiliateIncrease: Number(prodMaxIncrease),
-      stockQuantity: Number(prodStock),
-      imageUrls: [prodImageUrl.trim() || DEFAULT_FALLBACK_IMAGE],
-      isActive: editingProduct ? editingProduct.isActive : true,
-      createdAt: editingProduct ? editingProduct.createdAt : new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    try {
-      await setDoc(doc(db, 'products', productId), productPayload);
-      await CMSService.logActivity(adminUid, adminEmail, 'SAVE_PRODUCT', 'Products', `Saved product: ${prodName}`);
-      setShowProductModal(false);
-      setActionSuccess(`Product "${prodName}" saved successfully.`);
-      onRefreshProducts();
-      fetchAllData();
-    } catch (err: any) {
-      setActionError(err.message || 'Failed to save product.');
-    }
-  };
-
-  const handleToggleProductActive = async (p: Product) => {
-    try {
-      await updateDoc(doc(db, 'products', p.productId), {
-        isActive: !p.isActive,
-        updatedAt: new Date().toISOString(),
-      });
-      await CMSService.logActivity(adminUid, adminEmail, 'TOGGLE_PRODUCT', 'Products', `Toggled ${p.name} to ${!p.isActive ? 'active' : 'inactive'}`);
-      onRefreshProducts();
-      fetchAllData();
-    } catch (err: any) {
-      setActionError(err.message);
-    }
-  };
-
-  // Order Transition Handler
   const handleUpdateOrderStatus = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedOrder) return;
-
     try {
       await OrderService.updateOrderStatus({
         orderId: selectedOrder.orderId,
@@ -570,7 +733,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
             }
           : undefined,
       });
-      await CMSService.logActivity(adminUid, adminEmail, 'UPDATE_ORDER_STATUS', 'Orders', `Updated order #${selectedOrder.orderNumber} to ${orderNewStatus}`);
+      await CMSService.logActivity(adminUid, adminEmail, 'UPDATE_ORDER_STATUS', 'Orders', `Updated order #${selectedOrder.orderNumber}`);
       setSelectedOrder(null);
       setActionSuccess(`Order #${selectedOrder.orderNumber} updated to ${orderNewStatus}.`);
       fetchAllData();
@@ -579,7 +742,6 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     }
   };
 
-  // Application Approval Handler
   const handleApproveApplication = async () => {
     if (!selectedApp) return;
     try {
@@ -598,7 +760,6 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     }
   };
 
-  // Payout Handler
   const handleMarkPayoutPaid = async () => {
     if (!selectedPayout || !paymentRefCode.trim()) return;
     try {
@@ -608,7 +769,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
         paymentReference: paymentRefCode.trim(),
         notes: `Transfer confirmed via ${selectedPayout.paymentMethod.toUpperCase()}`,
       });
-      await CMSService.logActivity(adminUid, adminEmail, 'MARK_PAYOUT_PAID', 'Finance', `Processed payout ${selectedPayout.payoutId} with ref ${paymentRefCode}`);
+      await CMSService.logActivity(adminUid, adminEmail, 'MARK_PAYOUT_PAID', 'Finance', `Processed payout ${selectedPayout.payoutId}`);
       setSelectedPayout(null);
       setActionSuccess(`Payout marked as PAID. Reference: ${paymentRefCode.trim()}`);
       fetchAllData();
@@ -636,7 +797,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
   });
 
   // Filtered Products
-  const filteredProducts = products.filter(p =>
+  const filteredProducts = productList.filter(p =>
     productSearch === '' ||
     p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
     p.categoryName.toLowerCase().includes(productSearch.toLowerCase())
@@ -666,8 +827,8 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     {
       group: 'E-Commerce & Catalog',
       items: [
-        { id: 'products' as AdminTab, label: 'Products', icon: Package, badge: products.length },
-        { id: 'categories' as AdminTab, label: 'Categories', icon: Filter },
+        { id: 'products' as AdminTab, label: 'Products', icon: Package, badge: productList.length },
+        { id: 'categories' as AdminTab, label: 'Categories', icon: Filter, badge: categories.length },
         { id: 'orders' as AdminTab, label: 'Orders', icon: ShoppingBag, badge: pendingOrders > 0 ? pendingOrders : undefined },
         { id: 'customers' as AdminTab, label: 'Customers', icon: Users },
         { id: 'delivery_status' as AdminTab, label: 'Delivery & Status', icon: Truck },
@@ -879,10 +1040,10 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                 <div className="bg-slate-950 border border-slate-800 p-5 rounded-2xl">
                   <div className="text-xs text-slate-400 font-medium">Active Catalog Products</div>
                   <div className="text-2xl font-bold text-white mt-2">
-                    {products.length} Items
+                    {productList.length} Items
                   </div>
                   <div className="text-[11px] text-slate-500 mt-1">
-                    {products.filter(p => p.isActive).length} published online
+                    {productList.filter(p => p.isActive).length} published online
                   </div>
                 </div>
 
@@ -901,6 +1062,51 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                   </div>
                   <div className="text-[11px] text-slate-500 mt-1">Wednesday manual settlements</div>
                 </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <button
+                  type="button"
+                  onClick={openAddProductModal}
+                  className="p-4 bg-slate-950 border border-slate-800 hover:border-emerald-500 rounded-2xl text-left transition-colors flex items-center gap-3"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-emerald-950 text-emerald-400 flex items-center justify-center">
+                    <Plus className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white">Add New Product</div>
+                    <div className="text-[11px] text-slate-400">Expand catalog offering</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={openAddCategoryModal}
+                  className="p-4 bg-slate-950 border border-slate-800 hover:border-emerald-500 rounded-2xl text-left transition-colors flex items-center gap-3"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-blue-950 text-blue-400 flex items-center justify-center">
+                    <FolderPlus className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white">Add New Category</div>
+                    <div className="text-[11px] text-slate-400">Organize merchandise</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('homepage_builder')}
+                  className="p-4 bg-slate-950 border border-slate-800 hover:border-emerald-500 rounded-2xl text-left transition-colors flex items-center gap-3"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-purple-950 text-purple-400 flex items-center justify-center">
+                    <Sliders className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white">Customize Homepage</div>
+                    <div className="text-[11px] text-slate-400">Update live storefront CMS</div>
+                  </div>
+                </button>
               </div>
 
               {/* Recent Orders quick table */}
@@ -1081,7 +1287,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                 </button>
               </div>
 
-              {/* Section 1: Hero Banner */}
+              {/* Hero Section */}
               <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 space-y-4">
                 <h2 className="text-sm font-bold text-white border-b border-slate-800 pb-2">Hero Section</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1181,22 +1387,10 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                       className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
                     />
                   </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Hero Background Image URL</label>
-                    <input
-                      type="text"
-                      value={homepageCMS.hero.bgImageUrl}
-                      onChange={e => setHomepageCMS({
-                        ...homepageCMS,
-                        hero: { ...homepageCMS.hero, bgImageUrl: e.target.value },
-                      })}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
-                    />
-                  </div>
                 </div>
               </div>
 
-              {/* Section 2: Promotional Banner Bar */}
+              {/* Promotional Banner Bar */}
               <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                   <h2 className="text-sm font-bold text-white">Top Announcement & Free Delivery Banner</h2>
@@ -1238,7 +1432,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                 </div>
               </div>
 
-              {/* Section 3: Affiliate Promotion Block */}
+              {/* Affiliate Promotion Block */}
               <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 space-y-4">
                 <h2 className="text-sm font-bold text-white border-b border-slate-800 pb-2">
                   Affiliate Program Promotional Section
@@ -1611,7 +1805,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                   <div key={asset.id} className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden group">
                     <div className="h-40 bg-slate-900 overflow-hidden relative">
                       <img
-                        src={asset.url}
+                        src={ImageService.resolveProductImage(asset.url, asset.category)}
                         alt={asset.altText}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         onError={e => {
@@ -1679,15 +1873,6 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">OpenGraph Share Image URL</label>
-                  <input
-                    type="text"
-                    value={seoSettings.ogImage}
-                    onChange={e => setSeoSettings({ ...seoSettings, ogImage: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
-                  />
-                </div>
               </div>
             </div>
           )}
@@ -1713,28 +1898,16 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                   </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      setEditingProduct(null);
-                      setProdName('');
-                      setProdSlug('');
-                      setProdDesc('');
-                      setProdCategory('wearables');
-                      setProdCategoryName('Smart Wearables');
-                      setProdBasePrice(600);
-                      setProdMaxIncrease(150);
-                      setProdStock(50);
-                      setProdImageUrl('/src/assets/images/ronvex_hero_lifestyle_1792836927304.jpg');
-                      setShowProductModal(true);
-                    }}
-                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white rounded-xl flex items-center gap-1.5"
+                    onClick={openAddProductModal}
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white rounded-xl flex items-center gap-1.5 shadow-md"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>Add Product</span>
+                    <span>Add Catalog Product</span>
                   </button>
                 </div>
               </div>
 
-              <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden">
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
                 <table className="w-full text-left text-xs text-slate-300">
                   <thead className="bg-slate-900 text-slate-400 text-[11px] uppercase">
                     <tr>
@@ -1753,16 +1926,23 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                       <tr key={p.productId} className="hover:bg-slate-900/50">
                         <td className="p-3 flex items-center gap-3">
                           <img
-                            src={p.imageUrls?.[0] || DEFAULT_FALLBACK_IMAGE}
-                            alt=""
-                            className="w-10 h-10 object-cover rounded-lg bg-slate-900"
+                            src={ImageService.resolveProductImage(p.imageUrls?.[0], p.categoryId)}
+                            alt={p.name}
+                            className="w-12 h-12 object-cover rounded-xl bg-slate-900 border border-slate-800 shrink-0"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = ImageService.getCategoryFallback(p.categoryId);
+                            }}
                           />
                           <div>
                             <div className="font-semibold text-white">{p.name}</div>
                             <div className="text-[10px] text-slate-500 font-mono">/{p.slug}</div>
                           </div>
                         </td>
-                        <td className="p-3">{p.categoryName}</td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 bg-slate-900 border border-slate-800 rounded text-slate-300">
+                            {p.categoryName}
+                          </span>
+                        </td>
                         <td className="p-3 font-mono font-bold text-white">৳{p.adminBasePrice}</td>
                         <td className="p-3 font-mono text-emerald-400">+৳{p.maxAffiliateIncrease}</td>
                         <td className="p-3 font-mono text-slate-300">৳{p.adminBasePrice + p.maxAffiliateIncrease}</td>
@@ -1778,29 +1958,33 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                             {p.isActive ? 'ACTIVE' : 'INACTIVE'}
                           </button>
                         </td>
-                        <td className="p-3 text-right space-x-2">
+                        <td className="p-3 text-right space-x-2 whitespace-nowrap">
                           <button
                             type="button"
-                            onClick={() => {
-                              setEditingProduct(p);
-                              setProdName(p.name);
-                              setProdSlug(p.slug);
-                              setProdDesc(p.description);
-                              setProdCategory(p.categoryId);
-                              setProdCategoryName(p.categoryName);
-                              setProdBasePrice(p.adminBasePrice);
-                              setProdMaxIncrease(p.maxAffiliateIncrease);
-                              setProdStock(p.stockQuantity);
-                              setProdImageUrl(p.imageUrls?.[0] || DEFAULT_FALLBACK_IMAGE);
-                              setShowProductModal(true);
-                            }}
-                            className="p-1 text-slate-400 hover:text-white"
+                            onClick={() => openEditProductModal(p)}
+                            className="p-1.5 text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-lg inline-block"
+                            title="Edit Product"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteProduct(p)}
+                            className="p-1.5 text-slate-400 hover:text-rose-400 bg-slate-900 hover:bg-rose-950/40 rounded-lg inline-block"
+                            title="Delete Product"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </td>
                       </tr>
                     ))}
+                    {filteredProducts.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="p-8 text-center text-slate-500">
+                          No products found. Click "Add Catalog Product" above to create one.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -1810,38 +1994,70 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
           {/* 11. CATEGORIES */}
           {activeTab === 'categories' && (
             <div className="space-y-6">
-              <div>
-                <h1 className="text-2xl font-bold font-serif text-white">Product Categories</h1>
-                <p className="text-xs text-slate-400 mt-1">Organize products into customer-facing collections</p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl font-bold font-serif text-white">Product Categories</h1>
+                  <p className="text-xs text-slate-400 mt-1">Create and manage storefront merchandise categories</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={openAddCategoryModal}
+                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white rounded-xl flex items-center gap-1.5 shadow-md"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add New Category</span>
+                </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="bg-slate-950 border border-slate-800 p-5 rounded-2xl">
-                  <div className="text-xs font-mono text-emerald-400 uppercase">Slug: wearables</div>
-                  <div className="text-base font-bold text-white mt-1">Smart Wearables</div>
-                  <p className="text-xs text-slate-400 mt-1">AMOLED smartwatches, fitness trackers, and titanium casing.</p>
-                  <div className="mt-4 text-xs text-slate-500">
-                    {products.filter(p => p.categoryId === 'wearables').length} Products Assigned
-                  </div>
-                </div>
+              {/* Category Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {categories.map(cat => {
+                  const assignedCount = productList.filter(p => p.categoryId === cat.categoryId).length;
+                  return (
+                    <div key={cat.categoryId} className="bg-slate-950 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between space-y-4">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[11px] font-mono text-emerald-400 font-semibold uppercase">
+                            Slug: {cat.slug}
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              cat.isActive ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-slate-900 text-slate-500'
+                            }`}
+                          >
+                            {cat.isActive ? 'ACTIVE' : 'INACTIVE'}
+                          </span>
+                        </div>
+                        <h3 className="text-base font-bold text-white">{cat.name}</h3>
+                        <p className="text-xs text-slate-400 mt-1 line-clamp-2">{cat.description || 'No description provided.'}</p>
+                      </div>
 
-                <div className="bg-slate-950 border border-slate-800 p-5 rounded-2xl">
-                  <div className="text-xs font-mono text-emerald-400 uppercase">Slug: audio</div>
-                  <div className="text-base font-bold text-white mt-1">Wireless Audio</div>
-                  <p className="text-xs text-slate-400 mt-1">Active noise cancellation earbuds, studio sound, and low latency.</p>
-                  <div className="mt-4 text-xs text-slate-500">
-                    {products.filter(p => p.categoryId === 'audio').length} Products Assigned
-                  </div>
-                </div>
-
-                <div className="bg-slate-950 border border-slate-800 p-5 rounded-2xl">
-                  <div className="text-xs font-mono text-emerald-400 uppercase">Slug: accessories</div>
-                  <div className="text-base font-bold text-white mt-1">Tech Accessories</div>
-                  <p className="text-xs text-slate-400 mt-1">High-speed magnetic docks, premium braided cables, and straps.</p>
-                  <div className="mt-4 text-xs text-slate-500">
-                    {products.filter(p => p.categoryId === 'accessories').length} Products Assigned
-                  </div>
-                </div>
+                      <div className="pt-3 border-t border-slate-900 flex items-center justify-between">
+                        <span className="text-xs text-slate-400">
+                          <strong className="text-white font-mono">{assignedCount}</strong> products
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => openEditCategoryModal(cat)}
+                            className="p-1.5 text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-lg"
+                            title="Edit Category"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCategory(cat.categoryId)}
+                            className="p-1.5 text-slate-400 hover:text-rose-400 bg-slate-900 hover:bg-rose-950/40 rounded-lg"
+                            title="Delete Category"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -2010,7 +2226,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                               type="button"
                               onClick={() => {
                                 setSelectedApp(app);
-                                setAssignedSlug(app.fullName.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+                                setAssignedSlug(app.fullName.toLowerCase().replace(/[^a-z0-9_-]+/g, '-'));
                                 setReviewNote('Approved partner with verified social following');
                               }}
                               className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold"
@@ -2540,52 +2756,71 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
       {/* Product Add / Edit Modal */}
       {showProductModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
-          <div className="w-full max-w-lg bg-slate-950 border border-slate-800 rounded-2xl p-6 shadow-2xl relative my-8">
+          <div className="w-full max-w-xl bg-slate-950 border border-slate-800 rounded-2xl p-6 shadow-2xl relative my-8">
             <h3 className="text-base font-bold text-white mb-4">
               {editingProduct ? 'Edit Catalog Product' : 'Add New Catalog Product'}
             </h3>
-            <form onSubmit={handleSaveProduct} className="space-y-3">
+            <form onSubmit={handleSaveProduct} className="space-y-4">
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Product Name</label>
+                <label className="block text-xs text-slate-400 mb-1">Product Title *</label>
                 <input
                   type="text"
                   value={prodName}
-                  onChange={e => setProdName(e.target.value)}
+                  onChange={e => {
+                    setProdName(e.target.value);
+                    if (!editingProduct) {
+                      setProdSlug(e.target.value.toLowerCase().replace(/[^a-z0-9_-]+/g, '-'));
+                    }
+                  }}
+                  placeholder="e.g. Apex Horizon Titanium Smartwatch"
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
                   required
                 />
               </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Slug</label>
+                  <label className="block text-xs text-slate-400 mb-1">Slug URL</label>
                   <input
                     type="text"
                     value={prodSlug}
                     onChange={e => setProdSlug(e.target.value)}
+                    placeholder="e.g. apex-horizon-smartwatch"
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Category</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs text-slate-400">Category *</label>
+                    <button
+                      type="button"
+                      onClick={() => openAddCategoryModal()}
+                      className="text-[10px] text-emerald-400 hover:underline"
+                    >
+                      + New Category
+                    </button>
+                  </div>
                   <select
                     value={prodCategory}
                     onChange={e => {
+                      const selCat = categories.find(c => c.categoryId === e.target.value);
                       setProdCategory(e.target.value);
-                      if (e.target.value === 'wearables') setProdCategoryName('Smart Wearables');
-                      else if (e.target.value === 'audio') setProdCategoryName('Wireless Audio');
-                      else setProdCategoryName('Tech Accessories');
+                      if (selCat) setProdCategoryName(selCat.name);
                     }}
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
                   >
-                    <option value="wearables">Smart Wearables</option>
-                    <option value="audio">Wireless Audio</option>
-                    <option value="accessories">Tech Accessories</option>
+                    {categories.map(cat => (
+                      <option key={cat.categoryId} value={cat.categoryId}>
+                        {cat.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
+
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Admin Base (৳)</label>
+                  <label className="block text-xs text-slate-400 mb-1">Admin Base (৳) *</label>
                   <input
                     type="number"
                     value={prodBasePrice}
@@ -2595,7 +2830,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Affiliate Cap (৳)</label>
+                  <label className="block text-xs text-slate-400 mb-1">Max Bonus Cap (৳) *</label>
                   <input
                     type="number"
                     value={prodMaxIncrease}
@@ -2605,7 +2840,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Stock Quantity</label>
+                  <label className="block text-xs text-slate-400 mb-1">Stock Units *</label>
                   <input
                     type="number"
                     value={prodStock}
@@ -2615,25 +2850,85 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Image URL</label>
-                <input
-                  type="text"
-                  value={prodImageUrl}
-                  onChange={e => setProdImageUrl(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
-                />
+
+              {/* Product Image Section with Live Preview, Presets, and File Upload */}
+              <div className="p-4 bg-slate-900/80 border border-slate-800 rounded-xl space-y-3">
+                <label className="block text-xs font-semibold text-slate-300">Product Photography & Visual Asset</label>
+
+                <div className="flex gap-4 items-start">
+                  <div className="w-20 h-20 rounded-xl bg-slate-950 border border-slate-800 overflow-hidden shrink-0 flex items-center justify-center">
+                    <img
+                      src={ImageService.resolveProductImage(prodImageUrl, prodCategory)}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                      onError={e => {
+                        (e.target as HTMLImageElement).src = DEFAULT_FALLBACK_IMAGE;
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex-1 space-y-2">
+                    <input
+                      type="text"
+                      value={prodImageUrl}
+                      onChange={e => setProdImageUrl(e.target.value)}
+                      placeholder="Paste image URL (https://... or preset)"
+                      className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white font-mono"
+                    />
+
+                    <div className="flex items-center gap-2">
+                      <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg transition-colors">
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Upload Local File</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleProductImageUpload}
+                        />
+                      </label>
+                      <span className="text-[11px] text-slate-500">Supports JPG, PNG, WEBP</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Preset image quick clickers */}
+                <div>
+                  <div className="text-[11px] text-slate-400 mb-1.5 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-amber-400" />
+                    <span>Quick Curated Image Presets:</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {PRODUCT_IMAGE_PRESETS.map(preset => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => setProdImageUrl(preset.url)}
+                        className={`text-[11px] px-2.5 py-1 rounded-lg border transition-colors ${
+                          prodImageUrl === preset.url
+                            ? 'bg-emerald-950 border-emerald-500 text-emerald-300'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800'
+                        }`}
+                      >
+                        {preset.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
+
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Description</label>
                 <textarea
                   rows={3}
                   value={prodDesc}
                   onChange={e => setProdDesc(e.target.value)}
+                  placeholder="Detail build materials, warranty, battery, and key technical specifications..."
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
                 />
               </div>
-              <div className="flex items-center justify-end gap-2 pt-3">
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowProductModal(false)}
@@ -2643,9 +2938,90 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-md"
                 >
-                  Save Product
+                  {editingProduct ? 'Update Product' : 'Create Product'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Category Add / Edit Modal */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="w-full max-w-md bg-slate-950 border border-slate-800 rounded-2xl p-6 shadow-2xl relative">
+            <h3 className="text-base font-bold text-white mb-3">
+              {editingCategory ? 'Edit Product Category' : 'Add New Product Category'}
+            </h3>
+            <form onSubmit={handleSaveCategory} className="space-y-3">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Category Name *</label>
+                <input
+                  type="text"
+                  value={catName}
+                  onChange={e => {
+                    setCatName(e.target.value);
+                    if (!editingCategory) {
+                      setCatSlug(e.target.value.toLowerCase().replace(/[^a-z0-9_-]+/g, '-'));
+                    }
+                  }}
+                  placeholder="e.g. Wireless Audio, Smart Living"
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Category Slug</label>
+                <input
+                  type="text"
+                  value={catSlug}
+                  onChange={e => setCatSlug(e.target.value)}
+                  placeholder="e.g. wireless-audio"
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Description</label>
+                <textarea
+                  rows={2}
+                  value={catDesc}
+                  onChange={e => setCatDesc(e.target.value)}
+                  placeholder="Brief summary of items in this collection..."
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="catActive"
+                  checked={catIsActive}
+                  onChange={e => setCatIsActive(e.target.checked)}
+                  className="rounded text-emerald-600 focus:ring-0"
+                />
+                <label htmlFor="catActive" className="text-xs text-slate-300">
+                  Category is active and visible in catalog filters
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowCategoryModal(false)}
+                  className="px-3.5 py-1.5 text-xs text-slate-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-md"
+                >
+                  {editingCategory ? 'Update Category' : 'Save Category'}
                 </button>
               </div>
             </form>
@@ -2669,7 +3045,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                   onChange={e => {
                     setPageTitle(e.target.value);
                     if (!editingPage) {
-                      setPageSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+                      setPageSlug(e.target.value.toLowerCase().replace(/[^a-z0-9_-]+/g, '-'));
                     }
                   }}
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
@@ -2821,7 +3197,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                   type="text"
                   value={mediaUrl}
                   onChange={e => setMediaUrl(e.target.value)}
-                  placeholder="https://... or /src/assets/..."
+                  placeholder="https://... or /images/..."
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
                   required
                 />
@@ -2957,7 +3333,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                   <input
                     type="text"
                     value={assignedSlug}
-                    onChange={e => setAssignedSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, '-'))}
+                    onChange={e => setAssignedSlug(e.target.value.toLowerCase().replace(/[^a-z0-9_-]+/g, '-'))}
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
                     required
                   />

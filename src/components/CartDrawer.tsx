@@ -2,7 +2,7 @@ import React from 'react';
 import { X, Trash2, Plus, Minus, ArrowRight, ShoppingBag } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { PricingEngine } from '../services/pricingEngine';
-import { DEFAULT_FALLBACK_IMAGE } from '../services/imageService';
+import { ImageService, DEFAULT_FALLBACK_IMAGE } from '../services/imageService';
 
 interface CartDrawerProps {
   onNavigate: (view: string) => void;
@@ -66,12 +66,12 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onNavigate }) => {
                   className="flex gap-4 p-3 bg-slate-50 border border-slate-200/80 rounded-xl"
                 >
                   <img
-                    src={item.product.imageUrls?.[0] || DEFAULT_FALLBACK_IMAGE}
+                    src={ImageService.resolveProductImage(item.product.imageUrls?.[0], item.product.categoryId)}
                     alt={item.product.name}
                     referrerPolicy="no-referrer"
                     className="w-18 h-18 object-cover rounded-lg bg-white shrink-0 border border-slate-200"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = DEFAULT_FALLBACK_IMAGE;
+                      (e.target as HTMLImageElement).src = ImageService.getCategoryFallback(item.product.categoryId);
                     }}
                   />
 

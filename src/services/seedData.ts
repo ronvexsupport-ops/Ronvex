@@ -1,7 +1,9 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { Product } from '../types';
 import { DEFAULT_PLATFORM_SETTINGS } from './pricingEngine';
+import { BUNDLED_IMAGES, ImageService } from './imageService';
+import { CategoryService } from './categoryService';
 
 export const INITIAL_PRODUCTS: Product[] = [
   {
@@ -12,7 +14,7 @@ export const INITIAL_PRODUCTS: Product[] = [
       'Engineered with aerospace-grade titanium bezel, sapphire crystal AMOLED display, and comprehensive biometric tracking with up to 14 days battery life. Water-resistant up to 50 meters.',
     categoryId: 'wearables',
     categoryName: 'Smart Wearables',
-    imageUrls: ['/src/assets/images/product_smartwatch_elite_1792836929081.jpg'],
+    imageUrls: [BUNDLED_IMAGES.smartwatch],
     adminBasePrice: 600, // Matches prompt benchmark: Base ৳600, max increase ৳150
     maxAffiliateIncrease: 150,
     stockQuantity: 45,
@@ -28,8 +30,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     description:
       'True wireless active noise cancelling earbuds featuring custom 11mm graphene drivers, spatial sound architecture, and quad-mic beamforming for crystal-clear conversations in bustling cities.',
     categoryId: 'audio',
-    categoryName: 'Audio Hardware',
-    imageUrls: ['/src/assets/images/product_wireless_earbuds_1792836928757.jpg'],
+    categoryName: 'Wireless Audio',
+    imageUrls: [BUNDLED_IMAGES.earbuds],
     adminBasePrice: 1400,
     maxAffiliateIncrease: 350,
     stockQuantity: 60,
@@ -45,8 +47,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     description:
       'Weatherproof ballistic nylon structured shell with vegetable-tanned full-grain leather accents. Features a dedicated suspended 16-inch laptop compartment, hidden security pocket, and ergonomic back airflow channels.',
     categoryId: 'lifestyle',
-    categoryName: 'Bags & Luggage',
-    imageUrls: ['/src/assets/images/product_leather_commuter_bag_1792836929286.jpg'],
+    categoryName: 'Bags & Lifestyle',
+    imageUrls: [BUNDLED_IMAGES.bag],
     adminBasePrice: 2200,
     maxAffiliateIncrease: 500,
     stockQuantity: 32,
@@ -61,9 +63,9 @@ export const INITIAL_PRODUCTS: Product[] = [
     slug: 'chronos-minimalist-sapphire-watch',
     description:
       'Sleek 40mm 316L stainless steel case with sunburst dial and date complication. Japanese quartz precision movement with quick-release genuine leather strap.',
-    categoryId: 'watches',
-    categoryName: 'Accessories',
-    imageUrls: ['/src/assets/images/ronvex_hero_lifestyle_1792836927304.jpg'],
+    categoryId: 'accessories',
+    categoryName: 'Tech Accessories',
+    imageUrls: [BUNDLED_IMAGES.hero],
     adminBasePrice: 1800,
     maxAffiliateIncrease: 400,
     stockQuantity: 24,
@@ -83,12 +85,26 @@ export async function bootstrapDatabase(): Promise<void> {
       await setDoc(settingsRef, DEFAULT_PLATFORM_SETTINGS);
     }
 
-    // 2. Seed Products
+    // 2. Ensure Categories are initialized
+    await CategoryService.getCategories();
+
+    // 3. Seed / Repair Products
     for (const prod of INITIAL_PRODUCTS) {
       const prodRef = doc(db, 'products', prod.productId);
       const snap = await getDoc(prodRef);
       if (!snap.exists()) {
         await setDoc(prodRef, prod);
+      } else {
+        const data = snap.data();
+        // If image points to old unbundled raw path, update to guaranteed working bundled image
+        const currentImg = data.imageUrls?.[0] || '';
+        if (currentImg.startsWith('/src/assets/images/')) {
+          const resolved = ImageService.resolveProductImage(currentImg, prod.categoryId);
+          await updateDoc(prodRef, {
+            imageUrls: [resolved],
+            updatedAt: new Date().toISOString(),
+          });
+        }
       }
     }
   } catch (error) {

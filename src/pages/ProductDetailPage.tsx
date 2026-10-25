@@ -3,7 +3,7 @@ import { ArrowLeft, ShoppingBag, ShieldCheck, Truck, RotateCcw, Check, Plus, Min
 import { Product } from '../types';
 import { PricingEngine } from '../services/pricingEngine';
 import { useCart } from '../context/CartContext';
-import { DEFAULT_FALLBACK_IMAGE } from '../services/imageService';
+import { ImageService, DEFAULT_FALLBACK_IMAGE } from '../services/imageService';
 import { ProductCard } from '../components/ProductCard';
 
 interface ProductDetailPageProps {
@@ -26,7 +26,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const { addToCart } = useCart();
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState<string>(
-    product.imageUrls?.[0] || DEFAULT_FALLBACK_IMAGE
+    ImageService.resolveProductImage(product.imageUrls?.[0], product.categoryId)
   );
   const [addedNotice, setAddedNotice] = useState(false);
 
@@ -69,7 +69,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               referrerPolicy="no-referrer"
               className="w-full h-full object-cover object-center"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = DEFAULT_FALLBACK_IMAGE;
+                (e.target as HTMLImageElement).src = ImageService.getCategoryFallback(product.categoryId);
               }}
             />
           </div>

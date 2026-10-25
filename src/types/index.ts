@@ -47,6 +47,18 @@ export interface Affiliate {
   updatedAt?: string;
 }
 
+export interface ProductCategory {
+  categoryId: string;
+  name: string;
+  slug: string;
+  description: string;
+  iconName?: string;
+  productCount?: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Product {
   productId: string;
   name: string;

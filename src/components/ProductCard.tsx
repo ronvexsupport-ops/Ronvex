@@ -3,7 +3,7 @@ import { ShoppingBag, ArrowRight } from 'lucide-react';
 import { Product } from '../types';
 import { PricingEngine } from '../services/pricingEngine';
 import { useCart } from '../context/CartContext';
-import { DEFAULT_FALLBACK_IMAGE } from '../services/imageService';
+import { ImageService, DEFAULT_FALLBACK_IMAGE } from '../services/imageService';
 
 interface ProductCardProps {
   product: Product;
@@ -20,7 +20,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 }) => {
   const { addToCart } = useCart();
   const displayPrice = customSellingPrice !== undefined ? customSellingPrice : product.adminBasePrice;
-  const imageUrl = product.imageUrls?.[0] || DEFAULT_FALLBACK_IMAGE;
+  const imageUrl = ImageService.resolveProductImage(product.imageUrls?.[0], product.categoryId);
 
   return (
     <div className="group flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden hover:border-slate-300 transition-all duration-200">
@@ -35,7 +35,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           referrerPolicy="no-referrer"
           className="w-full h-full object-cover object-center group-hover:scale-[1.02] transition-transform duration-300"
           onError={(e) => {
-            (e.target as HTMLImageElement).src = DEFAULT_FALLBACK_IMAGE;
+            (e.target as HTMLImageElement).src = ImageService.getCategoryFallback(product.categoryId);
           }}
         />
         {product.stockQuantity <= 5 && product.stockQuantity > 0 && (
