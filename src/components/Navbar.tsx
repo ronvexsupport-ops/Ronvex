@@ -3,15 +3,16 @@ import { ShoppingBag, Search, User, ShieldCheck, TrendingUp, LogOut, ChevronDown
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { CMSService, DEFAULT_HEADER_CONFIG } from '../services/cmsService';
-import { HeaderConfig } from '../types';
+import { HeaderConfig, ProductCategory } from '../types';
 
 interface NavbarProps {
   currentView: string;
   onNavigate: (view: string, param?: string) => void;
+  categories?: ProductCategory[];
   affiliateStorefrontSlug?: string | null;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, affiliateStorefrontSlug }) => {
+export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, categories, affiliateStorefrontSlug }) => {
   const { itemCount, setIsCartOpen, activeAttribution } = useCart();
   const { currentUser, appUser, adminRecord, isAdmin, isAffiliate, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -29,6 +30,36 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, affilia
     };
     fetchHeader();
   }, []);
+
+  const handleNavClick = (url: string) => {
+    if (!url) {
+      onNavigate('shop');
+      return;
+    }
+    const clean = url.replace(/^#\/?/, '');
+    if (clean.includes('affiliate/register') || clean === 'affiliate-register' || clean === 'register') {
+      onNavigate('affiliate-register');
+    } else if (clean.includes('affiliate/dashboard') || clean === 'affiliate-dashboard') {
+      onNavigate('affiliate-dashboard');
+    } else if (clean.includes('affiliate/status') || clean === 'affiliate-status') {
+      onNavigate('affiliate-status');
+    } else if (clean.startsWith('shop')) {
+      const parts = clean.split('?category=');
+      if (parts.length > 1) {
+        onNavigate('shop', parts[1]);
+      } else {
+        onNavigate('shop');
+      }
+    } else if (clean.startsWith('page/')) {
+      onNavigate('page', clean.replace('page/', ''));
+    } else if (clean === 'track-order') {
+      onNavigate('track-order');
+    } else if (clean === 'admin' || clean === 'admin-portal') {
+      onNavigate('admin-portal');
+    } else {
+      onNavigate(clean || 'shop');
+    }
+  };
 
   const handleMobileNav = (view: string, param?: string) => {
     setShowMobileMenu(false);
@@ -72,47 +103,58 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, affilia
 
         {/* Zone 2: Desktop Navigation Links */}
         <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-slate-600">
-          <button
-            type="button"
-            onClick={() => onNavigate('shop')}
-            className={`whitespace-nowrap transition-colors hover:text-slate-950 ${
-              currentView === 'shop' ? 'text-slate-950 font-semibold underline underline-offset-8' : ''
-            }`}
-          >
-            Catalog
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate('shop', 'wearables')}
-            className="whitespace-nowrap transition-colors hover:text-slate-950"
-          >
-            Wearables
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate('shop', 'audio')}
-            className="whitespace-nowrap transition-colors hover:text-slate-950"
-          >
-            Audio
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate('track-order')}
-            className={`whitespace-nowrap transition-colors hover:text-slate-950 ${
-              currentView === 'track-order' ? 'text-slate-950 font-semibold underline underline-offset-8' : ''
-            }`}
-          >
-            Track Order
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate(isAffiliate ? 'affiliate-dashboard' : 'affiliate-register')}
-            className={`whitespace-nowrap transition-colors hover:text-slate-950 ${
-              currentView === 'affiliate-register' || currentView === 'affiliate-dashboard' ? 'text-slate-950 font-semibold underline underline-offset-8' : ''
-            }`}
-          >
-            {isAffiliate ? 'Affiliate Portal' : 'Join Affiliate Program'}
-          </button>
+          {headerConfig.navItems && headerConfig.navItems.length > 0 ? (
+            headerConfig.navItems.map(item => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleNavClick(item.url)}
+                className="whitespace-nowrap transition-colors hover:text-slate-950"
+              >
+                {item.label}
+              </button>
+            ))
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => onNavigate('shop')}
+                className={`whitespace-nowrap transition-colors hover:text-slate-950 ${
+                  currentView === 'shop' ? 'text-slate-950 font-semibold underline underline-offset-8' : ''
+                }`}
+              >
+                Catalog
+              </button>
+              {(categories || []).filter(c => c.isActive !== false).slice(0, 3).map(cat => (
+                <button
+                  key={cat.categoryId}
+                  type="button"
+                  onClick={() => onNavigate('shop', cat.categoryId)}
+                  className="whitespace-nowrap transition-colors hover:text-slate-950"
+                >
+                  {cat.name}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => onNavigate('track-order')}
+                className={`whitespace-nowrap transition-colors hover:text-slate-950 ${
+                  currentView === 'track-order' ? 'text-slate-950 font-semibold underline underline-offset-8' : ''
+                }`}
+              >
+                Track Order
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigate(isAffiliate ? 'affiliate-dashboard' : 'affiliate-register')}
+                className={`whitespace-nowrap transition-colors hover:text-slate-950 ${
+                  currentView === 'affiliate-register' || currentView === 'affiliate-dashboard' ? 'text-slate-950 font-semibold underline underline-offset-8' : ''
+                }`}
+              >
+                {isAffiliate ? 'Affiliate Portal' : 'Join Affiliate Program'}
+              </button>
+            </>
+          )}
         </nav>
 
         {/* Zone 3: Primary Action & Authentication Controls */}
@@ -250,34 +292,52 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, affilia
       {showMobileMenu && (
         <div className="md:hidden border-t border-slate-200 bg-white px-4 py-4 space-y-3 animate-fade-in shadow-lg">
           <div className="flex flex-col space-y-2 text-sm font-medium text-slate-700">
-            <button
-              type="button"
-              onClick={() => handleMobileNav('shop')}
-              className="text-left py-2 px-3 hover:bg-slate-50 rounded-lg"
-            >
-              Catalog
-            </button>
-            <button
-              type="button"
-              onClick={() => handleMobileNav('shop', 'wearables')}
-              className="text-left py-2 px-3 hover:bg-slate-50 rounded-lg"
-            >
-              Wearables
-            </button>
-            <button
-              type="button"
-              onClick={() => handleMobileNav('shop', 'audio')}
-              className="text-left py-2 px-3 hover:bg-slate-50 rounded-lg"
-            >
-              Audio
-            </button>
-            <button
-              type="button"
-              onClick={() => handleMobileNav('track-order')}
-              className="text-left py-2 px-3 hover:bg-slate-50 rounded-lg"
-            >
-              Track Order
-            </button>
+            {headerConfig.navItems && headerConfig.navItems.length > 0 ? (
+              headerConfig.navItems.map(item => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    setShowMobileMenu(false);
+                    handleNavClick(item.url);
+                  }}
+                  className="text-left py-2 px-3 hover:bg-slate-50 rounded-lg"
+                >
+                  {item.label}
+                </button>
+              ))
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleMobileNav('shop')}
+                  className="text-left py-2 px-3 hover:bg-slate-50 rounded-lg"
+                >
+                  Catalog
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMobileNav('shop', 'wearables')}
+                  className="text-left py-2 px-3 hover:bg-slate-50 rounded-lg"
+                >
+                  Wearables
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMobileNav('shop', 'audio')}
+                  className="text-left py-2 px-3 hover:bg-slate-50 rounded-lg"
+                >
+                  Audio
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMobileNav('track-order')}
+                  className="text-left py-2 px-3 hover:bg-slate-50 rounded-lg"
+                >
+                  Track Order
+                </button>
+              </>
+            )}
 
             {/* Mobile "Join Affiliate Program" Button */}
             <button

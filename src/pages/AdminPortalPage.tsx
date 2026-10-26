@@ -262,26 +262,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
   const fetchAllData = async () => {
     setLoading(true);
     try {
-      const [
-        prodSnap,
-        orderSnap,
-        appSnap,
-        affSnap,
-        payoutSnap,
-        commSnap,
-        loadedCats,
-        hpCMS,
-        header,
-        footer,
-        theme,
-        seo,
-        pages,
-        media,
-        couponList,
-        contacts,
-        admins,
-        logs,
-      ] = await Promise.all([
+      const results = await Promise.allSettled([
         getDocs(collection(db, 'products')),
         getDocs(collection(db, 'orders')),
         getDocs(collection(db, 'affiliateApplications')),
@@ -302,26 +283,87 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
         CMSService.getActivityLogs(50),
       ]);
 
-      if (!prodSnap.empty) {
-        setProductList(prodSnap.docs.map(d => d.data() as Product));
+      const [
+        prodRes,
+        orderRes,
+        appRes,
+        affRes,
+        payoutRes,
+        commRes,
+        catRes,
+        hpRes,
+        headerRes,
+        footerRes,
+        themeRes,
+        seoRes,
+        pageRes,
+        mediaRes,
+        couponRes,
+        contactRes,
+        adminRes,
+        logRes,
+      ] = results;
+
+      if (prodRes.status === 'fulfilled' && !prodRes.value.empty) {
+        setProductList(prodRes.value.docs.map(d => d.data() as Product));
       }
-      setOrders(orderSnap.docs.map(d => d.data() as Order));
-      setApplications(appSnap.docs.map(d => d.data() as AffiliateApplication));
-      setAffiliates(affSnap.docs.map(d => d.data() as Affiliate));
-      setPayouts(payoutSnap.docs.map(d => d.data() as Payout));
-      setCommissions(commSnap.docs.map(d => d.data() as Commission));
-      setCategories(loadedCats);
-      setHomepageCMS(hpCMS);
-      setHeaderConfig(header);
-      setFooterConfig(footer);
-      setThemeConfig(theme);
-      setSeoSettings(seo);
-      setCustomPages(pages);
-      setMediaAssets(media);
-      setCoupons(couponList);
-      setContactMessages(contacts);
-      setAdminUsers(admins);
-      setActivityLogs(logs);
+      if (orderRes.status === 'fulfilled') {
+        setOrders(orderRes.value.docs.map(d => d.data() as Order));
+      }
+      if (appRes.status === 'fulfilled') {
+        setApplications(appRes.value.docs.map(d => d.data() as AffiliateApplication));
+      }
+      if (affRes.status === 'fulfilled') {
+        setAffiliates(affRes.value.docs.map(d => d.data() as Affiliate));
+      }
+      if (payoutRes.status === 'fulfilled') {
+        setPayouts(payoutRes.value.docs.map(d => d.data() as Payout));
+      }
+      if (commRes.status === 'fulfilled') {
+        setCommissions(commRes.value.docs.map(d => d.data() as Commission));
+      }
+      if (catRes.status === 'fulfilled') {
+        setCategories(catRes.value);
+      }
+      if (hpRes.status === 'fulfilled') {
+        setHomepageCMS(hpRes.value);
+      }
+      if (headerRes.status === 'fulfilled') {
+        setHeaderConfig(headerRes.value);
+      }
+      if (footerRes.status === 'fulfilled') {
+        setFooterConfig(footerRes.value);
+      }
+      if (themeRes.status === 'fulfilled') {
+        setThemeConfig(themeRes.value);
+      }
+      if (seoRes.status === 'fulfilled') {
+        setSeoSettings(seoRes.value);
+      }
+      if (pageRes.status === 'fulfilled') {
+        setCustomPages(pageRes.value);
+      }
+      if (mediaRes.status === 'fulfilled') {
+        setMediaAssets(mediaRes.value);
+      }
+      if (couponRes.status === 'fulfilled') {
+        setCoupons(couponRes.value);
+      }
+      if (contactRes.status === 'fulfilled') {
+        setContactMessages(contactRes.value);
+      }
+      if (adminRes.status === 'fulfilled') {
+        setAdminUsers(adminRes.value);
+      }
+      if (logRes.status === 'fulfilled') {
+        setActivityLogs(logRes.value);
+      }
+
+      results.forEach((r, idx) => {
+        if (r.status === 'rejected') {
+          console.warn(`Admin query index ${idx} rejected:`, r.reason);
+        }
+      });
     } catch (err) {
       console.error('Error fetching admin data:', err);
     } finally {
@@ -568,67 +610,68 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
       updatedAt: new Date().toISOString(),
     };
 
-    // 1. Immediately persist to robust local storage cache
-    saveSingleProductLocally(productPayload);
-
-    // 2. Immediately update in-memory state
-    setProductList(prev => {
-      const idx = prev.findIndex(p => p.productId === productId);
-      if (idx >= 0) {
-        const updated = [...prev];
-        updated[idx] = productPayload;
-        return updated;
-      }
-      return [productPayload, ...prev];
-    });
-
-    setShowProductModal(false);
-    setActionSuccess(`Product "${prodName}" saved successfully.`);
-    onRefreshProducts();
-
-    // 3. Persist to Firestore
+    // Persist to Firestore first as source of truth
     try {
       await setDoc(doc(db, 'products', productId), productPayload);
       await CMSService.logActivity(adminUid, adminEmail, 'SAVE_PRODUCT', 'Products', `Saved product: ${prodName}`).catch(() => {});
+
+      // Persist to local storage cache
+      saveSingleProductLocally(productPayload);
+
+      // Update in-memory state
+      setProductList(prev => {
+        const idx = prev.findIndex(p => p.productId === productId);
+        if (idx >= 0) {
+          const updated = [...prev];
+          updated[idx] = productPayload;
+          return updated;
+        }
+        return [productPayload, ...prev];
+      });
+
+      setShowProductModal(false);
+      setActionSuccess(`Product "${prodName}" saved successfully.`);
+      onRefreshProducts();
       fetchAllData();
     } catch (err: any) {
-      console.warn('Product saved locally, Firestore sync notice:', err);
+      console.error('Failed to save product to database:', err);
+      setActionError(err.message || 'Failed to save product to database.');
     }
   };
 
   const handleToggleProductActive = async (p: Product) => {
-    const updatedProd = {
-      ...p,
-      isActive: !p.isActive,
-      updatedAt: new Date().toISOString(),
-    };
-    saveSingleProductLocally(updatedProd);
-    setProductList(prev => prev.map(prod => prod.productId === p.productId ? updatedProd : prod));
-    onRefreshProducts();
-
     try {
       await updateDoc(doc(db, 'products', p.productId), {
-        isActive: updatedProd.isActive,
-        updatedAt: updatedProd.updatedAt,
+        isActive: !p.isActive,
+        updatedAt: new Date().toISOString(),
       });
+      const updatedProd = {
+        ...p,
+        isActive: !p.isActive,
+        updatedAt: new Date().toISOString(),
+      };
+      saveSingleProductLocally(updatedProd);
+      setProductList(prev => prev.map(prod => prod.productId === p.productId ? updatedProd : prod));
       await CMSService.logActivity(adminUid, adminEmail, 'TOGGLE_PRODUCT', 'Products', `Toggled ${p.name}`).catch(() => {});
+      onRefreshProducts();
     } catch (err: any) {
-      console.warn('Toggle state updated locally, Firestore warning:', err);
+      console.error('Failed to update product status:', err);
+      setActionError(err.message || 'Failed to toggle product status in database.');
     }
   };
 
   const handleDeleteProduct = async (p: Product) => {
     if (!confirm(`Are you sure you want to delete "${p.name}"?`)) return;
-    deleteSingleProductLocally(p.productId);
-    setProductList(prev => prev.filter(prod => prod.productId !== p.productId));
-    setActionSuccess(`Product "${p.name}" deleted.`);
-    onRefreshProducts();
-
     try {
       await deleteDoc(doc(db, 'products', p.productId));
+      deleteSingleProductLocally(p.productId);
+      setProductList(prev => prev.filter(prod => prod.productId !== p.productId));
       await CMSService.logActivity(adminUid, adminEmail, 'DELETE_PRODUCT', 'Products', `Deleted ${p.name}`).catch(() => {});
+      setActionSuccess(`Product "${p.name}" deleted successfully.`);
+      onRefreshProducts();
     } catch (err: any) {
-      console.warn('Deleted locally, Firestore warning:', err);
+      console.error('Failed to delete product from database:', err);
+      setActionError(err.message || 'Failed to delete product from database.');
     }
   };
 

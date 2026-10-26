@@ -18,7 +18,7 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.email == 'ronvex.support@gmail.com' ||
+        (request.auth.token.email != null && request.auth.token.email.matches('(?i)^ronvex\\.support@gmail\\.com$')) ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
@@ -35,7 +35,7 @@ service cloud.firestore {
     match /admins/{adminId} {
       allow get: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
       allow list: if isAdmin();
-      allow write: if isAdmin() || (isSignedIn() && request.auth.token.email == 'ronvex.support@gmail.com' && request.auth.uid == adminId);
+      allow write: if isAdmin() || (isSignedIn() && request.auth.token.email != null && request.auth.token.email.matches('(?i)^ronvex\\.support@gmail\\.com$') && request.auth.uid == adminId);
     }
 
     // User profiles
@@ -68,7 +68,7 @@ service cloud.firestore {
     // Affiliate Applications
     match /affiliateApplications/{applicationId} {
       allow get: if isValidId(applicationId) && isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
-      allow list: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow list: if isAdmin();
       allow create: if isValidId(applicationId) && isSignedIn() &&
         request.resource.data.uid == request.auth.uid &&
         request.resource.data.applicationStatus == 'PENDING';
@@ -78,7 +78,8 @@ service cloud.firestore {
 
     // Approved Affiliates Profile & Storefront
     match /affiliates/{affiliateId} {
-      allow read: if isValidId(affiliateId);
+      allow get: if isValidId(affiliateId);
+      allow list: if true;
       allow create: if isValidId(affiliateId) && isAdmin();
       allow update: if isValidId(affiliateId) && (
         isAdmin() ||
@@ -90,7 +91,8 @@ service cloud.firestore {
 
     // Affiliate Custom Product Pricing
     match /affiliateProductPrices/{priceId} {
-      allow read: if isValidId(priceId);
+      allow get: if isValidId(priceId);
+      allow list: if true;
       allow create, update: if isValidId(priceId) && (
         isAdmin() ||
         (isSignedIn() &&
@@ -104,7 +106,7 @@ service cloud.firestore {
     // Orders
     match /orders/{orderId} {
       allow get: if isValidId(orderId);
-      allow list: if isAdmin() || (isSignedIn() && resource.data.affiliateId == request.auth.uid);
+      allow list: if isAdmin();
       allow create: if isValidId(orderId) &&
         request.resource.data.subtotal is number &&
         request.resource.data.deliveryCharge is number &&
@@ -120,8 +122,9 @@ service cloud.firestore {
 
     // Order Status History
     match /orderStatusHistory/{historyId} {
-      allow read: if isValidId(historyId) && (isAdmin() || isSignedIn());
-      allow create: if isValidId(historyId) && (isAdmin() || true);
+      allow get: if isValidId(historyId);
+      allow list: if isAdmin() || isSignedIn();
+      allow create: if isValidId(historyId);
       allow update, delete: if isAdmin();
     }
 
@@ -130,7 +133,7 @@ service cloud.firestore {
       allow get: if isValidId(commissionId) && (
         isAdmin() || (isSignedIn() && resource.data.affiliateId == request.auth.uid)
       );
-      allow list: if isAdmin() || (isSignedIn() && resource.data.affiliateId == request.auth.uid);
+      allow list: if isAdmin();
       allow write: if isValidId(commissionId) && isAdmin();
     }
 
@@ -139,7 +142,7 @@ service cloud.firestore {
       allow get: if isValidId(statId) && (
         isAdmin() || (isSignedIn() && resource.data.affiliateId == request.auth.uid)
       );
-      allow list: if isAdmin() || (isSignedIn() && resource.data.affiliateId == request.auth.uid);
+      allow list: if isAdmin();
       allow write: if isValidId(statId) && isAdmin();
     }
 
@@ -148,7 +151,7 @@ service cloud.firestore {
       allow get: if isValidId(payoutId) && (
         isAdmin() || (isSignedIn() && resource.data.affiliateId == request.auth.uid)
       );
-      allow list: if isAdmin() || (isSignedIn() && resource.data.affiliateId == request.auth.uid);
+      allow list: if isAdmin();
       allow create: if isValidId(payoutId) && isSignedIn() &&
         request.resource.data.affiliateId == request.auth.uid &&
         request.resource.data.status == 'REQUESTED' &&
@@ -159,7 +162,8 @@ service cloud.firestore {
 
     // Audit Logs
     match /auditLogs/{logId} {
-      allow read: if isValidId(logId) && isAdmin();
+      allow get: if isValidId(logId) && isAdmin();
+      allow list: if isAdmin();
       allow create: if isValidId(logId) && (isAdmin() || isSignedIn());
       allow update, delete: if false;
     }

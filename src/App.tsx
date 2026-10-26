@@ -5,7 +5,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider, useCart } from './context/CartContext';
 import { Product, ProductCategory, Order } from './types';
 import { bootstrapDatabase, INITIAL_PRODUCTS, getLocalProducts, saveLocalProducts } from './services/seedData';
-import { CategoryService, DEFAULT_CATEGORIES } from './services/categoryService';
+import { CategoryService, DEFAULT_CATEGORIES, getLocalCategories } from './services/categoryService';
 import { AttributionEngine } from './services/pricingEngine';
 
 import { Navbar } from './components/Navbar';
@@ -39,10 +39,10 @@ function AppContent() {
     const local = getLocalProducts();
     return local.length > 0 ? local : INITIAL_PRODUCTS;
   });
-  const [categories, setCategories] = useState<ProductCategory[]>(DEFAULT_CATEGORIES);
+  const [categories, setCategories] = useState<ProductCategory[]>(() => getLocalCategories());
   const [showDiagnostics, setShowDiagnostics] = useState(false);
 
-  // Initialize and load products & categories with dual cache persistence
+  // Initialize and load products & categories directly from Firestore
   const loadCatalog = async () => {
     try {
       await bootstrapDatabase();
@@ -50,19 +50,15 @@ function AppContent() {
         getDocs(collection(db, 'products')),
         CategoryService.getCategories(),
       ]);
-      const local = getLocalProducts();
-      let mergedProducts = local.length > 0 ? [...local] : [...INITIAL_PRODUCTS];
 
       if (!prodSnap.empty) {
         const firestoreProducts = prodSnap.docs.map(d => d.data() as Product);
-        const prodMap = new Map<string, Product>();
-        for (const p of INITIAL_PRODUCTS) prodMap.set(p.productId, p);
-        for (const p of local) prodMap.set(p.productId, p);
-        for (const p of firestoreProducts) prodMap.set(p.productId, p);
-        mergedProducts = Array.from(prodMap.values());
+        setProducts(firestoreProducts);
+        saveLocalProducts(firestoreProducts);
+      } else {
+        const local = getLocalProducts();
+        setProducts(local.length > 0 ? local : INITIAL_PRODUCTS);
       }
-      setProducts(mergedProducts);
-      saveLocalProducts(mergedProducts);
 
       if (catList && catList.length > 0) {
         setCategories(catList);
@@ -71,6 +67,7 @@ function AppContent() {
       console.warn('Catalog load fallback to local/initial cache:', err);
       const local = getLocalProducts();
       setProducts(local.length > 0 ? local : INITIAL_PRODUCTS);
+      setCategories(getLocalCategories());
     }
   };
 
@@ -201,6 +198,7 @@ function AppContent() {
       <Navbar
         currentView={currentView}
         onNavigate={handleNavigate}
+        categories={categories}
         affiliateStorefrontSlug={affiliateSlugForNavbar}
       />
 

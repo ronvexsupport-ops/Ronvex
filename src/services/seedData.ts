@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { Product } from '../types';
 import { DEFAULT_PLATFORM_SETTINGS } from './pricingEngine';
@@ -138,19 +138,16 @@ export async function bootstrapDatabase(): Promise<void> {
     // 2. Ensure Categories are initialized
     await CategoryService.getCategories();
 
-    // 3. Seed Products if missing
-    for (const prod of INITIAL_PRODUCTS) {
-      try {
-        const prodRef = doc(db, 'products', prod.productId);
-        const snap = await getDoc(prodRef);
-        if (!snap.exists()) {
-          // Check if local cache has an edited version first
-          const localList = getLocalProducts();
-          const localEdited = localList.find(p => p.productId === prod.productId);
-          await setDoc(prodRef, localEdited || prod);
+    // 3. Seed Products ONLY if the products collection is completely empty (first run)
+    const prodCol = collection(db, 'products');
+    const prodColSnap = await getDocs(prodCol);
+    if (prodColSnap.empty) {
+      for (const prod of INITIAL_PRODUCTS) {
+        try {
+          await setDoc(doc(db, 'products', prod.productId), prod);
+        } catch (prodErr) {
+          // Non-blocking
         }
-      } catch (prodErr) {
-        // Individual product seed error non-blocking
       }
     }
   } catch (error) {

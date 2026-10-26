@@ -1,7 +1,6 @@
 import {
   collection,
   doc,
-  getDoc,
   getDocs,
   setDoc,
   deleteDoc,
@@ -62,21 +61,24 @@ export const DEFAULT_CATEGORIES: ProductCategory[] = [
   },
 ];
 
-const CATEGORIES_STORAGE_KEY = 'ronvex_custom_categories';
+const CATEGORIES_STORAGE_KEY = 'ronvex_persisted_categories';
 
-function getLocalCategories(): ProductCategory[] {
+export function getLocalCategories(): ProductCategory[] {
   try {
     const raw = localStorage.getItem(CATEGORIES_STORAGE_KEY);
     if (raw) {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
     }
   } catch (e) {
     // ignore
   }
-  return [];
+  return DEFAULT_CATEGORIES;
 }
 
-function saveLocalCategories(cats: ProductCategory[]): void {
+export function saveLocalCategories(cats: ProductCategory[]): void {
   try {
     localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(cats));
   } catch (e) {
@@ -86,46 +88,33 @@ function saveLocalCategories(cats: ProductCategory[]): void {
 
 export class CategoryService {
   /**
-   * Fetches all categories from Firestore and local storage, ensuring defaults exist
-   * and newly created categories are preserved.
+   * Fetches all categories directly from Firestore (authoritative source).
+   * Only falls back to localStorage or defaults if network is offline.
    */
   public static async getCategories(): Promise<ProductCategory[]> {
-    const local = getLocalCategories();
-    let firestoreList: ProductCategory[] = [];
-
     try {
       const snap = await getDocs(collection(db, 'categories'));
       if (!snap.empty) {
-        firestoreList = snap.docs.map(d => d.data() as ProductCategory);
-      } else {
-        // First time initialization: seed default categories in Firestore
-        for (const cat of DEFAULT_CATEGORIES) {
-          await setDoc(doc(db, 'categories', cat.categoryId), cat).catch(() => {});
-        }
+        const firestoreList = snap.docs.map(d => d.data() as ProductCategory);
+        saveLocalCategories(firestoreList);
+        return firestoreList;
       }
+
+      // First time initialization ONLY if Firestore categories collection is truly empty
+      for (const cat of DEFAULT_CATEGORIES) {
+        await setDoc(doc(db, 'categories', cat.categoryId), cat).catch(() => {});
+      }
+      saveLocalCategories(DEFAULT_CATEGORIES);
+      return DEFAULT_CATEGORIES;
     } catch (err) {
-      console.warn('CategoryService: Error fetching categories from Firestore:', err);
+      console.warn('CategoryService: Error fetching categories from Firestore, using offline cache:', err);
+      return getLocalCategories();
     }
-
-    // Merge: DEFAULT_CATEGORIES + Firestore + Local
-    const categoryMap = new Map<string, ProductCategory>();
-    for (const c of DEFAULT_CATEGORIES) {
-      categoryMap.set(c.categoryId, c);
-    }
-    for (const c of firestoreList) {
-      categoryMap.set(c.categoryId, c);
-    }
-    for (const c of local) {
-      categoryMap.set(c.categoryId, c);
-    }
-
-    const merged = Array.from(categoryMap.values());
-    saveLocalCategories(merged);
-    return merged;
   }
 
   /**
-   * Creates or updates a category in Firestore and local storage.
+   * Creates or updates a category in Firestore persistently.
+   * Throws on failure so callers never report false successes.
    */
   public static async saveCategory(
     category: ProductCategory,
@@ -146,49 +135,26 @@ export class CategoryService {
       createdAt: category.createdAt || new Date().toISOString(),
     };
 
-    // 1. Immediately update localStorage
-    const local = getLocalCategories();
-    const map = new Map<string, ProductCategory>();
-    for (const c of DEFAULT_CATEGORIES) map.set(c.categoryId, c);
-    for (const c of local) map.set(c.categoryId, c);
-    map.set(cleanId, payload);
-    const updated = Array.from(map.values());
-    saveLocalCategories(updated);
+    // 1. MUST write to Firestore first (authoritative database)
+    await setDoc(doc(db, 'categories', cleanId), payload);
 
-    // 2. Persist to Firestore
-    try {
-      await setDoc(doc(db, 'categories', cleanId), payload);
-    } catch (err) {
-      console.error('CategoryService: Error saving to Firestore:', err);
-    }
-
-    return updated;
+    // 2. Fetch fresh authoritative list from Firestore
+    return await this.getCategories();
   }
 
   /**
-   * Deletes a category from Firestore and local storage.
+   * Deletes a category from Firestore persistently.
+   * Throws on failure so callers never report false successes.
    */
   public static async deleteCategory(
     categoryId: string,
     adminEmail?: string,
     adminUid?: string
   ): Promise<ProductCategory[]> {
-    const local = getLocalCategories().filter(c => c.categoryId !== categoryId);
-    saveLocalCategories(local);
+    // 1. MUST delete from Firestore first
+    await deleteDoc(doc(db, 'categories', categoryId));
 
-    try {
-      await deleteDoc(doc(db, 'categories', categoryId));
-    } catch (err) {
-      console.warn('CategoryService: Error deleting from Firestore:', err);
-    }
-
-    const map = new Map<string, ProductCategory>();
-    for (const c of DEFAULT_CATEGORIES) {
-      if (c.categoryId !== categoryId) map.set(c.categoryId, c);
-    }
-    for (const c of local) {
-      map.set(c.categoryId, c);
-    }
-    return Array.from(map.values());
+    // 2. Fetch fresh authoritative list from Firestore
+    return await this.getCategories();
   }
 }

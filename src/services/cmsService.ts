@@ -394,16 +394,10 @@ export class CMSService {
       updatedAt: new Date().toISOString(),
       updatedBy: adminEmail,
     };
-    // 1. Immediately persist to localStorage
+    // Persist to Firestore as source of truth
+    await setDoc(doc(db, 'cms', 'homepage'), updated);
     setLocalItem(CMS_HOMEPAGE_KEY, updated);
-
-    // 2. Persist to Firestore
-    try {
-      await setDoc(doc(db, 'cms', 'homepage'), updated);
-      await this.logActivity(adminUid, adminEmail, 'UPDATE_HOMEPAGE_CMS', 'CMS', 'Updated homepage builder content').catch(() => {});
-    } catch (e) {
-      console.warn('CMSService: Firestore save error (cached locally):', e);
-    }
+    await this.logActivity(adminUid, adminEmail, 'UPDATE_HOMEPAGE_CMS', 'CMS', 'Updated homepage builder content').catch(() => {});
   }
 
   // 2. Header & Navigation
@@ -427,13 +421,9 @@ export class CMSService {
       ...config,
       updatedAt: new Date().toISOString(),
     };
+    await setDoc(doc(db, 'cms', 'header'), updated);
     setLocalItem(CMS_HEADER_KEY, updated);
-    try {
-      await setDoc(doc(db, 'cms', 'header'), updated);
-      await this.logActivity(adminUid, adminEmail, 'UPDATE_HEADER', 'Header', 'Updated navigation links and header settings').catch(() => {});
-    } catch (e) {
-      console.warn('CMSService: Firestore header save error (cached locally):', e);
-    }
+    await this.logActivity(adminUid, adminEmail, 'UPDATE_HEADER', 'Header', 'Updated navigation links and header settings').catch(() => {});
   }
 
   // 3. Footer
@@ -457,13 +447,9 @@ export class CMSService {
       ...config,
       updatedAt: new Date().toISOString(),
     };
+    await setDoc(doc(db, 'cms', 'footer'), updated);
     setLocalItem(CMS_FOOTER_KEY, updated);
-    try {
-      await setDoc(doc(db, 'cms', 'footer'), updated);
-      await this.logActivity(adminUid, adminEmail, 'UPDATE_FOOTER', 'Footer', 'Updated footer columns, contact details, and copyright').catch(() => {});
-    } catch (e) {
-      console.warn('CMSService: Firestore footer save error (cached locally):', e);
-    }
+    await this.logActivity(adminUid, adminEmail, 'UPDATE_FOOTER', 'Footer', 'Updated footer columns, contact details, and copyright').catch(() => {});
   }
 
   // 4. Theme
@@ -487,13 +473,9 @@ export class CMSService {
       ...config,
       updatedAt: new Date().toISOString(),
     };
+    await setDoc(doc(db, 'cms', 'theme'), updated);
     setLocalItem(CMS_THEME_KEY, updated);
-    try {
-      await setDoc(doc(db, 'cms', 'theme'), updated);
-      await this.logActivity(adminUid, adminEmail, 'UPDATE_THEME', 'Theme', 'Updated brand appearance and colors').catch(() => {});
-    } catch (e) {
-      console.warn('CMSService: Firestore theme save error (cached locally):', e);
-    }
+    await this.logActivity(adminUid, adminEmail, 'UPDATE_THEME', 'Theme', 'Updated brand appearance and colors').catch(() => {});
   }
 
   // 5. SEO
@@ -517,35 +499,28 @@ export class CMSService {
       ...settings,
       updatedAt: new Date().toISOString(),
     };
+    await setDoc(doc(db, 'cms', 'seo'), updated);
     setLocalItem(CMS_SEO_KEY, updated);
-    try {
-      await setDoc(doc(db, 'cms', 'seo'), updated);
-      await this.logActivity(adminUid, adminEmail, 'UPDATE_SEO', 'SEO', 'Updated meta tags, keywords, and OpenGraph data').catch(() => {});
-    } catch (e) {
-      console.warn('CMSService: Firestore SEO save error (cached locally):', e);
-    }
+    await this.logActivity(adminUid, adminEmail, 'UPDATE_SEO', 'SEO', 'Updated meta tags, keywords, and OpenGraph data').catch(() => {});
   }
 
   // 6. Custom Dynamic Pages
   static async getPages(): Promise<CustomPage[]> {
-    const local = getLocalItem(CMS_PAGES_KEY, INITIAL_CUSTOM_PAGES);
     try {
       const snap = await getDocs(collection(db, 'pages'));
       if (!snap.empty) {
         const firestorePages = snap.docs.map(d => d.data() as CustomPage).sort((a, b) => a.order - b.order);
-        // Merge with local pages
-        const pageMap = new Map<string, CustomPage>();
-        for (const p of INITIAL_CUSTOM_PAGES) pageMap.set(p.slug, p);
-        for (const p of local) pageMap.set(p.slug, p);
-        for (const p of firestorePages) pageMap.set(p.slug, p);
-        const merged = Array.from(pageMap.values()).sort((a, b) => a.order - b.order);
-        setLocalItem(CMS_PAGES_KEY, merged);
-        return merged;
+        setLocalItem(CMS_PAGES_KEY, firestorePages);
+        return firestorePages;
       }
     } catch (e) {
-      console.warn('CMSService: Error fetching pages, using local cache:', e);
+      console.warn('CMSService: Error fetching pages, checking local cache:', e);
     }
-    return local;
+    const local = getLocalItem<CustomPage[] | null>(CMS_PAGES_KEY, null);
+    if (local && local.length > 0) {
+      return local;
+    }
+    return INITIAL_CUSTOM_PAGES;
   }
 
   static async savePage(page: CustomPage, adminEmail: string, adminUid: string): Promise<void> {
@@ -554,6 +529,9 @@ export class CMSService {
       updatedAt: new Date().toISOString(),
       updatedBy: adminEmail,
     };
+    // Write directly to Firestore first
+    await setDoc(doc(db, 'pages', page.slug), payload);
+
     // Update local cache
     const current = getLocalItem<CustomPage[]>(CMS_PAGES_KEY, INITIAL_CUSTOM_PAGES);
     const map = new Map<string, CustomPage>();
@@ -562,25 +540,15 @@ export class CMSService {
     const updated = Array.from(map.values()).sort((a, b) => a.order - b.order);
     setLocalItem(CMS_PAGES_KEY, updated);
 
-    try {
-      await setDoc(doc(db, 'pages', page.slug), payload);
-      await this.logActivity(adminUid, adminEmail, 'SAVE_PAGE', 'Pages', `Saved page: ${page.title} (/${page.slug})`).catch(() => {});
-    } catch (e) {
-      console.warn('CMSService: Firestore page save error (cached locally):', e);
-    }
+    await this.logActivity(adminUid, adminEmail, 'SAVE_PAGE', 'Pages', `Saved page: ${page.title} (/${page.slug})`).catch(() => {});
   }
 
   static async deletePage(slug: string, adminEmail: string, adminUid: string): Promise<void> {
+    await deleteDoc(doc(db, 'pages', slug));
     const current = getLocalItem<CustomPage[]>(CMS_PAGES_KEY, INITIAL_CUSTOM_PAGES);
     const updated = current.filter(p => p.slug !== slug);
     setLocalItem(CMS_PAGES_KEY, updated);
-
-    try {
-      await deleteDoc(doc(db, 'pages', slug));
-      await this.logActivity(adminUid, adminEmail, 'DELETE_PAGE', 'Pages', `Deleted page: /${slug}`).catch(() => {});
-    } catch (e) {
-      console.warn('CMSService: Firestore page delete error:', e);
-    }
+    await this.logActivity(adminUid, adminEmail, 'DELETE_PAGE', 'Pages', `Deleted page: /${slug}`).catch(() => {});
   }
 
   // 7. Media Library
