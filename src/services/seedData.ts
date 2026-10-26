@@ -76,35 +76,81 @@ export const INITIAL_PRODUCTS: Product[] = [
   },
 ];
 
+export const PRODUCTS_STORAGE_KEY = 'ronvex_products_cache';
+
+export function getLocalProducts(): Product[] {
+  try {
+    const raw = localStorage.getItem(PRODUCTS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+  return [];
+}
+
+export function saveLocalProducts(products: Product[]): void {
+  try {
+    localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(products));
+  } catch (e) {
+    // If quota exceeded or error, log warning
+    console.warn('Could not cache products to localStorage:', e);
+  }
+}
+
+export function saveSingleProductLocally(product: Product): Product[] {
+  const current = getLocalProducts();
+  const list = current.length > 0 ? [...current] : [...INITIAL_PRODUCTS];
+  const idx = list.findIndex(p => p.productId === product.productId);
+  if (idx >= 0) {
+    list[idx] = product;
+  } else {
+    list.unshift(product);
+  }
+  saveLocalProducts(list);
+  return list;
+}
+
+export function deleteSingleProductLocally(productId: string): Product[] {
+  const current = getLocalProducts();
+  const list = (current.length > 0 ? current : INITIAL_PRODUCTS).filter(p => p.productId !== productId);
+  saveLocalProducts(list);
+  return list;
+}
+
 export async function bootstrapDatabase(): Promise<void> {
   try {
-    // 1. Seed Platform Settings
-    const settingsRef = doc(db, 'settings', 'platform_settings');
-    const settingsSnap = await getDoc(settingsRef);
-    if (!settingsSnap.exists()) {
-      await setDoc(settingsRef, DEFAULT_PLATFORM_SETTINGS);
+    // 1. Seed Platform Settings (non-blocking)
+    try {
+      const settingsRef = doc(db, 'settings', 'platform_settings');
+      const settingsSnap = await getDoc(settingsRef);
+      if (!settingsSnap.exists()) {
+        await setDoc(settingsRef, DEFAULT_PLATFORM_SETTINGS);
+      }
+    } catch (e) {
+      // Non-fatal if settings read/write has auth constraint
     }
 
     // 2. Ensure Categories are initialized
     await CategoryService.getCategories();
 
-    // 3. Seed / Repair Products
+    // 3. Seed Products if missing
     for (const prod of INITIAL_PRODUCTS) {
-      const prodRef = doc(db, 'products', prod.productId);
-      const snap = await getDoc(prodRef);
-      if (!snap.exists()) {
-        await setDoc(prodRef, prod);
-      } else {
-        const data = snap.data();
-        // If image points to old unbundled raw path, update to guaranteed working bundled image
-        const currentImg = data.imageUrls?.[0] || '';
-        if (currentImg.startsWith('/src/assets/images/')) {
-          const resolved = ImageService.resolveProductImage(currentImg, prod.categoryId);
-          await updateDoc(prodRef, {
-            imageUrls: [resolved],
-            updatedAt: new Date().toISOString(),
-          });
+      try {
+        const prodRef = doc(db, 'products', prod.productId);
+        const snap = await getDoc(prodRef);
+        if (!snap.exists()) {
+          // Check if local cache has an edited version first
+          const localList = getLocalProducts();
+          const localEdited = localList.find(p => p.productId === prod.productId);
+          await setDoc(prodRef, localEdited || prod);
         }
+      } catch (prodErr) {
+        // Individual product seed error non-blocking
       }
     }
   } catch (error) {

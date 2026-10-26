@@ -391,7 +391,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             </div>
           </div>
 
-          {/* Policy Accordions (Inspired by reference in image_c90644e2.png) */}
+          {/* Accordion */}
           <div className="border border-slate-200 rounded-xl divide-y divide-slate-200 overflow-hidden text-xs">
             {/* Description Accordion */}
             <div>
@@ -411,57 +411,6 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                     <li>Premium high-grade materials crafted for durability and performance.</li>
                     <li>Carefully inspected prior to express dispatch.</li>
                   </ul>
-                </div>
-              )}
-            </div>
-
-            {/* Disclaimer Accordion */}
-            <div>
-              <button
-                type="button"
-                onClick={() => setOpenAccordion(openAccordion === 'disclaimer' ? null : 'disclaimer')}
-                className="w-full py-3 px-4 flex items-center justify-between font-semibold text-slate-900 hover:bg-slate-50 transition-colors text-left"
-              >
-                <span>Disclaimer & Variations</span>
-                <ChevronDown className={`w-4 h-4 transition-transform ${openAccordion === 'disclaimer' ? 'rotate-180' : ''}`} />
-              </button>
-              {openAccordion === 'disclaimer' && (
-                <div className="p-4 bg-slate-50/50 text-slate-600 leading-relaxed border-t border-slate-100">
-                  Product colors and finish may vary slightly due to studio photographic lighting sources or monitor/screen display calibrations. Ronvex guarantees high craftsmanship on every item.
-                </div>
-              )}
-            </div>
-
-            {/* Return & Exchange Accordion */}
-            <div>
-              <button
-                type="button"
-                onClick={() => setOpenAccordion(openAccordion === 'returns' ? null : 'returns')}
-                className="w-full py-3 px-4 flex items-center justify-between font-semibold text-slate-900 hover:bg-slate-50 transition-colors text-left"
-              >
-                <span>Return & Exchange Policy</span>
-                <ChevronDown className={`w-4 h-4 transition-transform ${openAccordion === 'returns' ? 'rotate-180' : ''}`} />
-              </button>
-              {openAccordion === 'returns' && (
-                <div className="p-4 bg-slate-50/50 text-slate-600 leading-relaxed border-t border-slate-100">
-                  We offer a 7-day replacement guarantee for any factory defects. Please report any discrepancy within 72 hours of parcel receipt along with opening photos/video.
-                </div>
-              )}
-            </div>
-
-            {/* Shipping Policy Accordion */}
-            <div>
-              <button
-                type="button"
-                onClick={() => setOpenAccordion(openAccordion === 'shipping' ? null : 'shipping')}
-                className="w-full py-3 px-4 flex items-center justify-between font-semibold text-slate-900 hover:bg-slate-50 transition-colors text-left"
-              >
-                <span>Shipping Policy</span>
-                <ChevronDown className={`w-4 h-4 transition-transform ${openAccordion === 'shipping' ? 'rotate-180' : ''}`} />
-              </button>
-              {openAccordion === 'shipping' && (
-                <div className="p-4 bg-slate-50/50 text-slate-600 leading-relaxed border-t border-slate-100">
-                  Inside Dhaka: Standard delivery 24-48 hours (৳80). Outside Dhaka: Delivery within 48-72 hours via Pathao Courier or Steadfast (৳150). Cash on delivery available nationwide.
                 </div>
               )}
             </div>

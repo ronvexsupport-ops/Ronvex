@@ -4,7 +4,7 @@ import { db, testFirestoreConnection } from './services/firebase';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider, useCart } from './context/CartContext';
 import { Product, ProductCategory, Order } from './types';
-import { bootstrapDatabase, INITIAL_PRODUCTS } from './services/seedData';
+import { bootstrapDatabase, INITIAL_PRODUCTS, getLocalProducts, saveLocalProducts } from './services/seedData';
 import { CategoryService, DEFAULT_CATEGORIES } from './services/categoryService';
 import { AttributionEngine } from './services/pricingEngine';
 
@@ -35,11 +35,14 @@ function AppContent() {
   const [customPriceForSelected, setCustomPriceForSelected] = useState<number | undefined>(undefined);
   const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null);
 
-  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
+  const [products, setProducts] = useState<Product[]>(() => {
+    const local = getLocalProducts();
+    return local.length > 0 ? local : INITIAL_PRODUCTS;
+  });
   const [categories, setCategories] = useState<ProductCategory[]>(DEFAULT_CATEGORIES);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
 
-  // Initialize and load products & categories from Firestore
+  // Initialize and load products & categories with dual cache persistence
   const loadCatalog = async () => {
     try {
       await bootstrapDatabase();
@@ -47,15 +50,27 @@ function AppContent() {
         getDocs(collection(db, 'products')),
         CategoryService.getCategories(),
       ]);
+      const local = getLocalProducts();
+      let mergedProducts = local.length > 0 ? [...local] : [...INITIAL_PRODUCTS];
+
       if (!prodSnap.empty) {
-        setProducts(prodSnap.docs.map(d => d.data() as Product));
+        const firestoreProducts = prodSnap.docs.map(d => d.data() as Product);
+        const prodMap = new Map<string, Product>();
+        for (const p of INITIAL_PRODUCTS) prodMap.set(p.productId, p);
+        for (const p of local) prodMap.set(p.productId, p);
+        for (const p of firestoreProducts) prodMap.set(p.productId, p);
+        mergedProducts = Array.from(prodMap.values());
       }
+      setProducts(mergedProducts);
+      saveLocalProducts(mergedProducts);
+
       if (catList && catList.length > 0) {
         setCategories(catList);
       }
     } catch (err) {
-      console.warn('Catalog load fallback to initial seed:', err);
-      setProducts(INITIAL_PRODUCTS);
+      console.warn('Catalog load fallback to local/initial cache:', err);
+      const local = getLocalProducts();
+      setProducts(local.length > 0 ? local : INITIAL_PRODUCTS);
     }
   };
 

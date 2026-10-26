@@ -85,8 +85,8 @@ export class ImageService {
   }
 
   /**
-   * Resolves any image URL string (bundled asset, public path, or external URL)
-   * to a guaranteed working URL in both dev and production.
+   * Resolves any image URL string (bundled asset, public path, data URL, or external URL)
+   * to a guaranteed working URL in both dev and production without hijacking uploaded photos.
    */
   public static resolveProductImage(url?: string | null, category?: string): string {
     if (!url || typeof url !== 'string' || url.trim() === '') {
@@ -95,30 +95,42 @@ export class ImageService {
 
     const trimmed = url.trim();
 
-    // Direct match to bundled asset file names or keywords
-    if (trimmed.includes('smartwatch') || trimmed.includes('titanium') || trimmed.includes('watch')) {
+    // 1. Data URLs (uploaded images) or Blob URLs - preserve user's exact uploaded image
+    if (trimmed.startsWith('data:image/') || trimmed.startsWith('blob:')) {
+      return trimmed;
+    }
+
+    // 2. Direct HTTP(S) URLs
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+
+    // 3. Root public paths or relative paths
+    if (trimmed.startsWith('/')) {
+      return trimmed;
+    }
+
+    // 4. Exact bundled asset matches or explicit bundled asset identifiers
+    if (trimmed === 'smartwatch' || trimmed === BUNDLED_IMAGES.smartwatch || trimmed.endsWith('product_smartwatch_elite_1792836929081.jpg')) {
       return smartwatchImg;
     }
-    if (trimmed.includes('earbuds') || trimmed.includes('anc') || trimmed.includes('audio')) {
+    if (trimmed === 'earbuds' || trimmed === BUNDLED_IMAGES.earbuds || trimmed.endsWith('product_wireless_earbuds_1792836928757.jpg')) {
       return earbudsImg;
     }
-    if (trimmed.includes('bag') || trimmed.includes('backpack') || trimmed.includes('leather')) {
+    if (trimmed === 'bag' || trimmed === BUNDLED_IMAGES.bag || trimmed.endsWith('product_leather_commuter_bag_1792836929286.jpg')) {
       return bagImg;
     }
-    if (trimmed.includes('hero') || trimmed.includes('lifestyle')) {
+    if (trimmed === 'hero' || trimmed === BUNDLED_IMAGES.hero || trimmed.endsWith('ronvex_hero_lifestyle_1792836927304.jpg')) {
       return heroImg;
     }
 
-    // Direct HTTP(S) URLs or data URLs
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:image')) {
-      return trimmed;
+    // 5. Preset image matching
+    const matchedPreset = PRODUCT_IMAGE_PRESETS.find(p => p.id === trimmed || p.url === trimmed);
+    if (matchedPreset) {
+      return matchedPreset.url;
     }
 
-    // Root public paths
-    if (trimmed.startsWith('/images/')) {
-      return trimmed;
-    }
-
+    // Default fallback based on category
     return this.getCategoryFallback(category);
   }
 
@@ -147,15 +159,17 @@ export class ImageService {
     if (!validTypes.includes(file.type)) {
       return { valid: false, error: 'Only JPG, PNG, WEBP, and AVIF image formats are supported.' };
     }
-    const maxSizeBytes = 5 * 1024 * 1024; // 5MB limit
+    const maxSizeBytes = 12 * 1024 * 1024; // Allow up to 12MB input before client-side optimization
     if (file.size > maxSizeBytes) {
-      return { valid: false, error: 'File size exceeds maximum permitted limit (5MB).' };
+      return { valid: false, error: 'File size exceeds maximum permitted limit (12MB).' };
     }
     return { valid: true };
   }
 
   /**
-   * Upload file to configured external provider or convert to client preview Data URL
+   * Upload file and optimize into a high-clarity, lightweight Data URL.
+   * Compresses through canvas to 1200px max dimension and ~80KB JPEG/WebP so multiple
+   * photos effortlessly fit within Firestore document limits and load swiftly.
    */
   public static async uploadImage(file: File): Promise<string> {
     const validation = this.validateFile(file);
@@ -163,11 +177,57 @@ export class ImageService {
       throw new Error(validation.error || 'Invalid file format');
     }
 
-    // Read file as optimized Data URL
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => {
-        resolve(reader.result as string);
+      reader.onload = (event) => {
+        const rawResult = event.target?.result as string;
+        if (!rawResult) {
+          reject(new Error('Failed to read image data'));
+          return;
+        }
+
+        // Optimize through canvas
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const maxDimension = 1200; // Sharp HD resolution for product detail & zoom
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxDimension || height > maxDimension) {
+              if (width > height) {
+                height = Math.round((height * maxDimension) / width);
+                width = maxDimension;
+              } else {
+                width = Math.round((width * maxDimension) / height);
+                height = maxDimension;
+              }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              resolve(rawResult);
+              return;
+            }
+
+            // Clean white background for transparent images
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, width, height);
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // Compress to crisp quality JPEG (~40-80KB per photo)
+            const compressedUrl = canvas.toDataURL('image/jpeg', 0.82);
+            resolve(compressedUrl);
+          } catch (e) {
+            // Fallback to raw if canvas processing meets any browser constraint
+            resolve(rawResult);
+          }
+        };
+        img.onerror = () => resolve(rawResult);
+        img.src = rawResult;
       };
       reader.onerror = () => reject(new Error('Failed to read image file data'));
       reader.readAsDataURL(file);

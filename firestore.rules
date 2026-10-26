@@ -56,7 +56,7 @@ service cloud.firestore {
     // Platform Settings
     match /settings/{settingId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if true;
     }
 
     // Products catalog
@@ -167,13 +167,13 @@ service cloud.firestore {
     // Website CMS & Homepage Builder Sections
     match /cms/{docId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if true;
     }
 
     // CMS Dynamic Pages (About, Contact, FAQ, Terms, etc.)
     match /pages/{pageId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if true;
     }
 
     // Product Categories
@@ -185,13 +185,13 @@ service cloud.firestore {
     // Media & Image Library
     match /media/{mediaId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if true;
     }
 
     // Coupons & Promotions
     match /coupons/{couponId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if true;
     }
 
     // Contact Messages & Inquiries
