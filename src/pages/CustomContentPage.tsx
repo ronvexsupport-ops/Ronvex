@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Phone, MapPin, Send, CheckCircle2, AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, CheckCircle2, AlertCircle, ArrowLeft, Loader2, Share2, Check } from 'lucide-react';
 import { CMSService, INITIAL_CUSTOM_PAGES } from '../services/cmsService';
 import { CustomPage } from '../types';
+import { applySEO } from '../utils/seoUtils';
+import { buildPublicUrl } from '../utils/slugUtils';
+import { useAuth } from '../context/AuthContext';
 
 interface CustomContentPageProps {
   slug: string;
@@ -9,8 +12,10 @@ interface CustomContentPageProps {
 }
 
 export const CustomContentPage: React.FC<CustomContentPageProps> = ({ slug, onNavigate }) => {
+  const { isAdmin } = useAuth();
   const [page, setPage] = useState<CustomPage | null>(null);
   const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
 
   // Contact form state if on contact page
   const [contactName, setContactName] = useState('');
@@ -23,25 +28,47 @@ export const CustomContentPage: React.FC<CustomContentPageProps> = ({ slug, onNa
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
     const loadPage = async () => {
       setLoading(true);
       try {
-        const pages = await CMSService.getPages();
-        const found = pages.find(p => p.slug === slug);
-        if (found) {
-          setPage(found);
-        } else {
-          const fallback = INITIAL_CUSTOM_PAGES.find(p => p.slug === slug);
-          setPage(fallback || null);
+        const found = await CMSService.getPageBySlug(slug);
+        if (isMounted) {
+          if (found && (found.isPublished || isAdmin)) {
+            setPage(found);
+            applySEO({
+              title: found.title,
+              seoTitle: found.seoTitle || found.metaTitle,
+              metaDescription: found.metaDescription,
+              ogImage: found.featuredImageUrl,
+              canonicalPath: `/pages/${found.slug}`,
+              type: 'website',
+            });
+          } else {
+            setPage(null);
+          }
         }
       } catch (err) {
         console.warn('Error loading custom page:', err);
+        if (isMounted) setPage(null);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
     loadPage();
-  }, [slug]);
+    return () => {
+      isMounted = false;
+    };
+  }, [slug, isAdmin]);
+
+  const handleCopyLink = () => {
+    if (!page) return;
+    const urls = buildPublicUrl('page', page.slug);
+    navigator.clipboard.writeText(urls.fullUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    });
+  };
 
   const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,7 +113,7 @@ export const CustomContentPage: React.FC<CustomContentPageProps> = ({ slug, onNa
     return (
       <div className="max-w-3xl mx-auto px-4 py-20 text-center">
         <h1 className="text-2xl font-bold font-serif text-slate-900 mb-2">Page Not Found</h1>
-        <p className="text-sm text-slate-500 mb-6">The requested informational page could not be located.</p>
+        <p className="text-sm text-slate-500 mb-6">The requested page could not be located or is currently unpublished.</p>
         <button
           type="button"
           onClick={() => onNavigate('home')}
@@ -101,22 +128,58 @@ export const CustomContentPage: React.FC<CustomContentPageProps> = ({ slug, onNa
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="mb-8">
+      {/* Draft banner notice if viewing draft as admin */}
+      {!page.isPublished && (
+        <div className="mb-6 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+          <span>
+            <strong>Draft Mode:</strong> This page is currently unpublished and not visible to public visitors.
+          </span>
+        </div>
+      )}
+
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <button
+            type="button"
+            onClick={() => onNavigate('home')}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-900 mb-2 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Home</span>
+          </button>
+          <h1 className="text-3xl sm:text-4xl font-extrabold font-serif text-slate-950 tracking-tight">
+            {page.title}
+          </h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Last updated: {new Date(page.updatedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+          </p>
+        </div>
+
         <button
           type="button"
-          onClick={() => onNavigate('home')}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-900 mb-4 transition-colors"
+          onClick={handleCopyLink}
+          className="self-start sm:self-center inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-slate-300 rounded-xl text-xs font-medium text-slate-700 shadow-xs transition-colors"
         >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Home</span>
+          {copied ? (
+            <>
+              <Check className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="text-emerald-700 font-semibold">Link Copied!</span>
+            </>
+          ) : (
+            <>
+              <Share2 className="w-3.5 h-3.5 text-slate-500" />
+              <span>Copy Link</span>
+            </>
+          )}
         </button>
-        <h1 className="text-3xl sm:text-4xl font-extrabold font-serif text-slate-950 tracking-tight">
-          {page.title}
-        </h1>
-        <p className="text-xs text-slate-400 mt-1">
-          Last updated: {new Date(page.updatedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-        </p>
       </div>
+
+      {page.featuredImageUrl && (
+        <div className="mb-8 rounded-2xl overflow-hidden border border-slate-200 shadow-xs max-h-[380px] bg-slate-100">
+          <img src={page.featuredImageUrl} alt={page.title} className="w-full h-full object-cover" />
+        </div>
+      )}
 
       <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-10 shadow-xs space-y-6">
         <div className="prose prose-slate max-w-none text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">
@@ -124,7 +187,7 @@ export const CustomContentPage: React.FC<CustomContentPageProps> = ({ slug, onNa
         </div>
 
         {/* If this is the contact page, show interactive contact form */}
-        {(slug === 'contact' || slug === 'contact-us') && (
+        {(slug === 'contact' || slug === 'contact-us' || slug === 'contact-ronvex') && (
           <div className="mt-12 pt-8 border-t border-slate-200">
             <h2 className="text-lg font-bold font-serif text-slate-900 mb-2">Send Us a Direct Message</h2>
             <p className="text-xs text-slate-500 mb-6">

@@ -170,6 +170,48 @@
         "attributionWindowDays": { "type": "number" }
       },
       "required": ["currency", "currencySymbol", "defaultMonthlyTarget", "defaultMonthlyBonus"]
+    },
+    "Page": {
+      "title": "Page",
+      "description": "CMS static and dynamic policy pages",
+      "type": "object",
+      "properties": {
+        "pageId": { "type": "string" },
+        "slug": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "featuredImageUrl": { "type": "string" },
+        "seoTitle": { "type": "string" },
+        "metaDescription": { "type": "string" },
+        "isPublished": { "type": "boolean" },
+        "showInHeader": { "type": "boolean" },
+        "showInFooter": { "type": "boolean" },
+        "order": { "type": "number" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["slug", "title", "content", "isPublished"]
+    },
+    "BlogPost": {
+      "title": "BlogPost",
+      "description": "Editorial articles and blog posts",
+      "type": "object",
+      "properties": {
+        "postId": { "type": "string" },
+        "slug": { "type": "string" },
+        "title": { "type": "string" },
+        "bodyContent": { "type": "string" },
+        "excerpt": { "type": "string" },
+        "featuredImageUrl": { "type": "string" },
+        "author": { "type": "string" },
+        "publicationDate": { "type": "string" },
+        "isPublished": { "type": "boolean" },
+        "category": { "type": "string" },
+        "seoTitle": { "type": "string" },
+        "metaDescription": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["postId", "slug", "title", "bodyContent", "author", "isPublished"]
     }
   },
   "firestore": {
@@ -212,6 +254,14 @@
     "/settings/{settingId}": {
       "schema": "Setting",
       "description": "Platform global settings"
+    },
+    "/pages/{pageId}": {
+      "schema": "Page",
+      "description": "CMS custom content pages"
+    },
+    "/posts/{postId}": {
+      "schema": "BlogPost",
+      "description": "Articles and blog publications"
     }
   }
 }

@@ -32,8 +32,14 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onOpenDiagnostics })
       onNavigate('affiliate-status');
     } else if (clean.includes('affiliate/dashboard') || clean === 'affiliate-dashboard') {
       onNavigate('affiliate-dashboard');
+    } else if (clean.startsWith('pages/')) {
+      onNavigate('page', clean.replace('pages/', ''));
     } else if (clean.startsWith('page/')) {
       onNavigate('page', clean.replace('page/', ''));
+    } else if (clean.startsWith('blog/')) {
+      onNavigate('blog-post', clean.replace('blog/', ''));
+    } else if (clean === 'blog') {
+      onNavigate('blog');
     } else if (clean.startsWith('shop')) {
       const parts = clean.split('?category=');
       if (parts.length > 1) {

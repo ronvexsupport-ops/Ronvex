@@ -25,6 +25,8 @@ import { AffiliateStatusPage } from './pages/AffiliateStatusPage';
 import { AffiliateDashboardPage } from './pages/AffiliateDashboardPage';
 import { AdminPortalPage } from './pages/AdminPortalPage';
 import { CustomContentPage } from './pages/CustomContentPage';
+import { BlogPostPage } from './pages/BlogPostPage';
+import { BlogListPage } from './pages/BlogListPage';
 
 function AppContent() {
   const { setActiveAttribution } = useCart();
@@ -91,33 +93,47 @@ function AppContent() {
         });
       }
 
+      // Check URL hash or direct pathname fallback
+      let route = hash;
+      if (!route) {
+        const rawPath = window.location.pathname.replace(/^\//, '');
+        if (rawPath) route = rawPath;
+      }
+
       // Check specific top-level routes first to avoid route shadowing
-      if (hash === 'affiliate/register' || hash === 'affiliate-register' || hash === 'register') {
+      if (route === 'affiliate/register' || route === 'affiliate-register' || route === 'register') {
         setCurrentView('affiliate-register');
         setViewParam(undefined);
-      } else if (hash === 'affiliate/dashboard' || hash === 'affiliate-dashboard') {
+      } else if (route === 'affiliate/dashboard' || route === 'affiliate-dashboard') {
         setCurrentView('affiliate-dashboard');
         setViewParam(undefined);
-      } else if (hash.startsWith('affiliate/status') || hash.startsWith('affiliate-status')) {
-        const parts = hash.split('/');
+      } else if (route.startsWith('affiliate/status') || route.startsWith('affiliate-status')) {
+        const parts = route.split('/');
         setCurrentView('affiliate-status');
         if (parts.length > 2) setViewParam(parts[2]);
         else setViewParam(undefined);
-      } else if (hash === 'shop') {
+      } else if (route === 'shop') {
         setCurrentView('shop');
         setViewParam(undefined);
-      } else if (hash === 'track-order') {
+      } else if (route === 'blog') {
+        setCurrentView('blog');
+        setViewParam(undefined);
+      } else if (route.startsWith('blog/')) {
+        const slug = route.replace('blog/', '');
+        setCurrentView('blog-post');
+        setViewParam(slug);
+      } else if (route === 'track-order') {
         setCurrentView('track-order');
         setViewParam(undefined);
-      } else if (hash === 'admin' || hash === 'admin-portal') {
+      } else if (route === 'admin' || route === 'admin-portal') {
         setCurrentView('admin-portal');
         setViewParam(undefined);
-      } else if (hash.startsWith('store/')) {
-        const slug = hash.replace('store/', '');
+      } else if (route.startsWith('store/')) {
+        const slug = route.replace('store/', '');
         setCurrentView('affiliate-storefront');
         setViewParam(slug);
-      } else if (hash.startsWith('affiliate/')) {
-        const slug = hash.replace('affiliate/', '');
+      } else if (route.startsWith('affiliate/')) {
+        const slug = route.replace('affiliate/', '');
         if (slug === 'register') {
           setCurrentView('affiliate-register');
           setViewParam(undefined);
@@ -133,18 +149,22 @@ function AppContent() {
           setCurrentView('affiliate-storefront');
           setViewParam(slug);
         }
-      } else if (hash.startsWith('page/')) {
-        const slug = hash.replace('page/', '');
+      } else if (route.startsWith('pages/')) {
+        const slug = route.replace('pages/', '');
         setCurrentView('page');
         setViewParam(slug);
-      } else if (hash.startsWith('product/')) {
-        const slug = hash.replace('product/', '');
+      } else if (route.startsWith('page/')) {
+        const slug = route.replace('page/', '');
+        setCurrentView('page');
+        setViewParam(slug);
+      } else if (route.startsWith('product/')) {
+        const slug = route.replace('product/', '');
         const p = products.find(prod => prod.slug === slug);
         if (p) {
           setSelectedProduct(p);
           setCurrentView('product-detail');
         }
-      } else if (!hash || hash === 'home') {
+      } else if (!route || route === 'home') {
         setCurrentView('home');
         setViewParam(undefined);
       }
@@ -152,7 +172,11 @@ function AppContent() {
 
     parseUrl();
     window.addEventListener('hashchange', parseUrl);
-    return () => window.removeEventListener('hashchange', parseUrl);
+    window.addEventListener('popstate', parseUrl);
+    return () => {
+      window.removeEventListener('hashchange', parseUrl);
+      window.removeEventListener('popstate', parseUrl);
+    };
   }, [setActiveAttribution]);
 
   const handleNavigate = (view: string, param?: string) => {
@@ -174,7 +198,9 @@ function AppContent() {
     else if (targetView === 'affiliate-register') window.location.hash = 'affiliate/register';
     else if (targetView === 'affiliate-dashboard') window.location.hash = 'affiliate/dashboard';
     else if (targetView === 'admin-portal') window.location.hash = 'admin';
-    else if (targetView === 'page' && param) window.location.hash = `page/${param}`;
+    else if (targetView === 'page' && param) window.location.hash = `pages/${param}`;
+    else if (targetView === 'blog') window.location.hash = 'blog';
+    else if (targetView === 'blog-post' && param) window.location.hash = `blog/${param}`;
   };
 
   const handleSelectProduct = (product: Product, customPrice?: number) => {
@@ -286,6 +312,17 @@ function AppContent() {
         {currentView === 'page' && (
           <CustomContentPage
             slug={viewParam || 'about-us'}
+            onNavigate={handleNavigate}
+          />
+        )}
+
+        {currentView === 'blog' && (
+          <BlogListPage onNavigate={handleNavigate} />
+        )}
+
+        {currentView === 'blog-post' && (
+          <BlogPostPage
+            slug={viewParam || ''}
             onNavigate={handleNavigate}
           />
         )}

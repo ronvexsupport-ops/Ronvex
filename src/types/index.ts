@@ -337,18 +337,39 @@ export interface HomepageCMSConfig {
   updatedBy?: string;
 }
 
-// ---------------- Dynamic Custom Pages ----------------
+// ---------------- Dynamic Custom Pages & Blog Posts ----------------
 export interface CustomPage {
   pageId: string;
   slug: string;
   title: string;
   content: string; // Markdown or formatted text
   metaTitle?: string;
+  seoTitle?: string;
   metaDescription?: string;
+  featuredImageUrl?: string;
   isPublished: boolean;
   showInHeader: boolean;
   showInFooter: boolean;
   order: number;
+  updatedAt: string;
+  updatedBy?: string;
+}
+
+export interface BlogPost {
+  postId: string;
+  slug: string;
+  title: string;
+  bodyContent: string;
+  excerpt?: string;
+  featuredImageUrl?: string;
+  author: string;
+  publicationDate: string; // YYYY-MM-DD or ISO string
+  isPublished: boolean;
+  category?: string;
+  tags?: string[];
+  seoTitle?: string;
+  metaDescription?: string;
+  createdAt: string;
   updatedAt: string;
   updatedBy?: string;
 }

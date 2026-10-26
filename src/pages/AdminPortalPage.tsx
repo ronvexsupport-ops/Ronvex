@@ -48,6 +48,9 @@ import {
   Send,
   FolderPlus,
   Sparkles,
+  BookOpen,
+  Copy,
+  RotateCw,
 } from 'lucide-react';
 import {
   collection,
@@ -74,6 +77,7 @@ import {
   ThemeConfig,
   SEOSettings,
   CustomPage,
+  BlogPost,
   MediaAsset,
   Coupon,
   ContactMessage,
@@ -86,6 +90,14 @@ import { PricingEngine, DEFAULT_PLATFORM_SETTINGS } from '../services/pricingEng
 import { OrderService } from '../services/orderService';
 import { AffiliateService } from '../services/affiliateService';
 import { PayoutService } from '../services/payoutService';
+import { BlogService, INITIAL_BLOG_POSTS } from '../services/blogService';
+import {
+  generateSlug,
+  normalizeSlug,
+  resolveUniqueSlug,
+  buildPublicUrl,
+} from '../utils/slugUtils';
+import { generateSitemapXml } from '../utils/seoUtils';
 import {
   ImageService,
   DEFAULT_FALLBACK_IMAGE,
@@ -122,6 +134,7 @@ export type AdminTab =
   | 'website_editor'
   | 'homepage_builder'
   | 'pages_content'
+  | 'blog_posts'
   | 'header_nav'
   | 'footer_editor'
   | 'theme_appearance'
@@ -171,6 +184,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
   const [themeConfig, setThemeConfig] = useState<ThemeConfig>(DEFAULT_THEME_CONFIG);
   const [seoSettings, setSeoSettings] = useState<SEOSettings>(DEFAULT_SEO_SETTINGS);
   const [customPages, setCustomPages] = useState<CustomPage[]>(INITIAL_CUSTOM_PAGES);
+  const [blogPosts, setBlogPosts] = useState<BlogPost[]>(INITIAL_BLOG_POSTS);
   const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([]);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
@@ -211,8 +225,40 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
   const [editingPage, setEditingPage] = useState<CustomPage | null>(null);
   const [pageTitle, setPageTitle] = useState('');
   const [pageSlug, setPageSlug] = useState('');
+  const [pageIsSlugCustom, setPageIsSlugCustom] = useState(false);
   const [pageContent, setPageContent] = useState('');
+  const [pageFeaturedImage, setPageFeaturedImage] = useState('');
+  const [pageSeoTitle, setPageSeoTitle] = useState('');
+  const [pageMetaDesc, setPageMetaDesc] = useState('');
   const [pagePublished, setPagePublished] = useState(true);
+  const [pageShowInFooter, setPageShowInFooter] = useState(true);
+  const [pageShowInHeader, setPageShowInHeader] = useState(false);
+  const [pageCopiedSlug, setPageCopiedSlug] = useState<string | null>(null);
+
+  // Blog Post Editor Modal State
+  const [showBlogPostModal, setShowBlogPostModal] = useState(false);
+  const [editingBlogPost, setEditingBlogPost] = useState<BlogPost | null>(null);
+  const [postTitle, setPostTitle] = useState('');
+  const [postSlug, setPostSlug] = useState('');
+  const [postIsSlugCustom, setPostIsSlugCustom] = useState(false);
+  const [postExcerpt, setPostExcerpt] = useState('');
+  const [postBodyContent, setPostBodyContent] = useState('');
+  const [postFeaturedImage, setPostFeaturedImage] = useState('');
+  const [postAuthor, setPostAuthor] = useState('RONVEX Editorial');
+  const [postPublicationDate, setPostPublicationDate] = useState(new Date().toISOString().split('T')[0]);
+  const [postCategory, setPostCategory] = useState('Guides');
+  const [postTags, setPostTags] = useState('');
+  const [postSeoTitle, setPostSeoTitle] = useState('');
+  const [postMetaDesc, setPostMetaDesc] = useState('');
+  const [postPublished, setPostPublished] = useState(true);
+  const [postCopiedSlug, setPostCopiedSlug] = useState<string | null>(null);
+  const [postSearch, setPostSearch] = useState('');
+  const [postFilterCategory, setPostFilterCategory] = useState('ALL');
+
+  // XML Sitemap State
+  const [showSitemapModal, setShowSitemapModal] = useState(false);
+  const [sitemapXmlContent, setSitemapXmlContent] = useState('');
+  const [sitemapCopied, setSitemapCopied] = useState(false);
 
   // Coupon Modal
   const [showCouponModal, setShowCouponModal] = useState(false);
@@ -276,6 +322,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
         CMSService.getThemeConfig(),
         CMSService.getSEOSettings(),
         CMSService.getPages(),
+        BlogService.getPosts(),
         CMSService.getMediaAssets(),
         CMSService.getCoupons(),
         CMSService.getContactMessages(),
@@ -297,6 +344,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
         themeRes,
         seoRes,
         pageRes,
+        blogRes,
         mediaRes,
         couponRes,
         contactRes,
@@ -342,6 +390,9 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
       }
       if (pageRes.status === 'fulfilled') {
         setCustomPages(pageRes.value);
+      }
+      if (blogRes.status === 'fulfilled') {
+        setBlogPosts(blogRes.value);
       }
       if (mediaRes.status === 'fulfilled') {
         setMediaAssets(mediaRes.value);
@@ -737,29 +788,171 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     }
   };
 
+  // ---------------- PAGE HANDLERS WITH AUTO-SLUG ----------------
+  const handlePageTitleChange = (val: string) => {
+    setPageTitle(val);
+    if (!pageIsSlugCustom) {
+      const candidate = generateSlug(val);
+      const unique = resolveUniqueSlug(candidate, customPages.map(p => p.slug), editingPage?.slug);
+      setPageSlug(unique);
+    }
+  };
+
+  const handlePageSlugChange = (val: string) => {
+    setPageSlug(val);
+    setPageIsSlugCustom(true);
+  };
+
+  const handleRegeneratePageSlug = () => {
+    const candidate = generateSlug(pageTitle);
+    const unique = resolveUniqueSlug(candidate, customPages.map(p => p.slug), editingPage?.slug);
+    setPageSlug(unique);
+    setPageIsSlugCustom(false);
+  };
+
   const handleSavePage = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!pageTitle.trim()) {
+      setActionError('Page title is required.');
+      return;
+    }
     try {
-      const cleanSlug = pageSlug.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-');
+      const baseSlug = normalizeSlug(pageSlug) || generateSlug(pageTitle);
+      const uniqueSlug = resolveUniqueSlug(baseSlug, customPages.map(p => p.slug), editingPage?.slug);
+
       const payload: CustomPage = {
-        pageId: cleanSlug,
-        slug: cleanSlug,
+        pageId: editingPage?.pageId || uniqueSlug,
+        slug: uniqueSlug,
         title: pageTitle.trim(),
         content: pageContent,
+        featuredImageUrl: pageFeaturedImage.trim() || undefined,
+        seoTitle: pageSeoTitle.trim() || undefined,
+        metaTitle: pageSeoTitle.trim() || undefined,
+        metaDescription: pageMetaDesc.trim() || undefined,
         isPublished: pagePublished,
-        showInHeader: editingPage ? editingPage.showInHeader : false,
-        showInFooter: editingPage ? editingPage.showInFooter : true,
+        showInHeader: pageShowInHeader,
+        showInFooter: pageShowInFooter,
         order: editingPage ? editingPage.order : customPages.length + 1,
         updatedAt: new Date().toISOString(),
+        updatedBy: adminEmail,
       };
+
       await CMSService.savePage(payload, adminEmail, adminUid);
       setShowPageModal(false);
-      setActionSuccess(`Page "${payload.title}" saved.`);
+      setActionSuccess(`Page "${payload.title}" saved successfully (/pages/${payload.slug}).`);
       const updated = await CMSService.getPages();
       setCustomPages(updated);
     } catch (err: any) {
-      setActionError(err.message);
+      setActionError(err.message || 'Failed to save page.');
     }
+  };
+
+  const handleDeletePage = async (slug: string) => {
+    if (!confirm(`Are you sure you want to delete page "/pages/${slug}"? This cannot be undone.`)) return;
+    try {
+      await CMSService.deletePage(slug, adminEmail, adminUid);
+      setActionSuccess(`Page "/pages/${slug}" deleted.`);
+      const updated = await CMSService.getPages();
+      setCustomPages(updated);
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to delete page.');
+    }
+  };
+
+  const handleCopyPageUrl = (slug: string) => {
+    const { fullUrl } = buildPublicUrl('page', slug);
+    navigator.clipboard.writeText(fullUrl).then(() => {
+      setPageCopiedSlug(slug);
+      setTimeout(() => setPageCopiedSlug(null), 2500);
+    });
+  };
+
+  // ---------------- BLOG POST HANDLERS WITH AUTO-SLUG ----------------
+  const handlePostTitleChange = (val: string) => {
+    setPostTitle(val);
+    if (!postIsSlugCustom) {
+      const candidate = generateSlug(val);
+      const unique = resolveUniqueSlug(candidate, blogPosts.map(p => p.slug), editingBlogPost?.slug);
+      setPostSlug(unique);
+    }
+  };
+
+  const handlePostSlugChange = (val: string) => {
+    setPostSlug(val);
+    setPostIsSlugCustom(true);
+  };
+
+  const handleRegeneratePostSlug = () => {
+    const candidate = generateSlug(postTitle);
+    const unique = resolveUniqueSlug(candidate, blogPosts.map(p => p.slug), editingBlogPost?.slug);
+    setPostSlug(unique);
+    setPostIsSlugCustom(false);
+  };
+
+  const handleSaveBlogPost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!postTitle.trim()) {
+      setActionError('Post title is required.');
+      return;
+    }
+    try {
+      const baseSlug = normalizeSlug(postSlug) || generateSlug(postTitle);
+      const uniqueSlug = resolveUniqueSlug(baseSlug, blogPosts.map(p => p.slug), editingBlogPost?.slug);
+      const postId = editingBlogPost?.postId || `post_${Date.now()}`;
+
+      const payload: BlogPost = {
+        postId,
+        slug: uniqueSlug,
+        title: postTitle.trim(),
+        bodyContent: postBodyContent,
+        excerpt: postExcerpt.trim() || undefined,
+        featuredImageUrl: postFeaturedImage.trim() || undefined,
+        author: postAuthor.trim() || 'RONVEX Editorial',
+        publicationDate: postPublicationDate || new Date().toISOString().split('T')[0],
+        category: postCategory.trim() || 'Guides',
+        tags: postTags ? postTags.split(',').map(t => t.trim()).filter(Boolean) : [],
+        seoTitle: postSeoTitle.trim() || undefined,
+        metaDescription: postMetaDesc.trim() || undefined,
+        isPublished: postPublished,
+        createdAt: editingBlogPost ? editingBlogPost.createdAt : new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        updatedBy: adminEmail,
+      };
+
+      await BlogService.savePost(payload, adminEmail, adminUid);
+      setShowBlogPostModal(false);
+      setActionSuccess(`Blog post "${payload.title}" saved successfully (/blog/${payload.slug}).`);
+      const updated = await BlogService.getPosts();
+      setBlogPosts(updated);
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to save blog post.');
+    }
+  };
+
+  const handleDeleteBlogPost = async (postId: string, title: string) => {
+    if (!confirm(`Are you sure you want to delete post "${title}"?`)) return;
+    try {
+      await BlogService.deletePost(postId, adminEmail, adminUid);
+      setActionSuccess(`Blog post removed.`);
+      const updated = await BlogService.getPosts();
+      setBlogPosts(updated);
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to delete blog post.');
+    }
+  };
+
+  const handleCopyPostUrl = (slug: string) => {
+    const { fullUrl } = buildPublicUrl('post', slug);
+    navigator.clipboard.writeText(fullUrl).then(() => {
+      setPostCopiedSlug(slug);
+      setTimeout(() => setPostCopiedSlug(null), 2500);
+    });
+  };
+
+  const handleGenerateSitemap = () => {
+    const xml = generateSitemapXml(productList, customPages, blogPosts);
+    setSitemapXmlContent(xml);
+    setShowSitemapModal(true);
   };
 
   const handleSaveCoupon = async (e: React.FormEvent) => {
@@ -909,7 +1102,8 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
       items: [
         { id: 'website_editor' as AdminTab, label: 'Website Editor / CMS', icon: Globe },
         { id: 'homepage_builder' as AdminTab, label: 'Homepage Builder', icon: Sliders },
-        { id: 'pages_content' as AdminTab, label: 'Pages & Content', icon: FileText },
+        { id: 'pages_content' as AdminTab, label: 'Pages & Content', icon: FileText, badge: customPages.length },
+        { id: 'blog_posts' as AdminTab, label: 'Blog Posts', icon: BookOpen, badge: blogPosts.length },
         { id: 'header_nav' as AdminTab, label: 'Header & Navigation', icon: Navigation },
         { id: 'footer_editor' as AdminTab, label: 'Footer Editor', icon: Columns },
         { id: 'theme_appearance' as AdminTab, label: 'Theme & Appearance', icon: Palette },
@@ -1575,11 +1769,11 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
           {/* 4. PAGES & CONTENT */}
           {activeTab === 'pages_content' && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h1 className="text-2xl font-bold font-serif text-white">Custom Pages & Policy Content</h1>
+                  <h1 className="text-2xl font-bold font-serif text-white">Pages & Policies Management</h1>
                   <p className="text-xs text-slate-400 mt-1">
-                    Manage static policy pages, About Us, Contact, and customer service documentation
+                    Manage static policy pages, About Us, Contact, and custom information pages with automatic SEO slugs
                   </p>
                 </div>
                 <button
@@ -1588,71 +1782,363 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                     setEditingPage(null);
                     setPageTitle('');
                     setPageSlug('');
+                    setPageIsSlugCustom(false);
                     setPageContent('');
+                    setPageFeaturedImage('');
+                    setPageSeoTitle('');
+                    setPageMetaDesc('');
                     setPagePublished(true);
+                    setPageShowInFooter(true);
+                    setPageShowInHeader(false);
                     setShowPageModal(true);
                   }}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white rounded-xl flex items-center gap-1.5"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white rounded-xl flex items-center gap-1.5 shadow-sm transition-colors"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Create New Page</span>
                 </button>
               </div>
 
-              <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden">
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-xs">
                 <table className="w-full text-left text-xs text-slate-300">
-                  <thead className="bg-slate-900 text-slate-400 text-[11px] uppercase">
+                  <thead className="bg-slate-900 text-slate-400 text-[11px] uppercase tracking-wider">
                     <tr>
-                      <th className="p-3">Page Title</th>
-                      <th className="p-3">Slug URL</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3">Show In Footer</th>
-                      <th className="p-3">Last Updated</th>
-                      <th className="p-3 text-right">Actions</th>
+                      <th className="p-3.5">Page Title</th>
+                      <th className="p-3.5">Public URL & Slug</th>
+                      <th className="p-3.5">Status</th>
+                      <th className="p-3.5">Placement</th>
+                      <th className="p-3.5">Last Updated</th>
+                      <th className="p-3.5 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60">
-                    {customPages.map(page => (
-                      <tr key={page.slug} className="hover:bg-slate-900/50">
-                        <td className="p-3 font-semibold text-white">{page.title}</td>
-                        <td className="p-3 font-mono text-slate-400">/page/{page.slug}</td>
-                        <td className="p-3">
-                          <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              page.isPublished ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-slate-800 text-slate-400'
-                            }`}
-                          >
-                            {page.isPublished ? 'PUBLISHED' : 'DRAFT'}
-                          </span>
-                        </td>
-                        <td className="p-3">{page.showInFooter ? 'Yes' : 'No'}</td>
-                        <td className="p-3 text-slate-500">{new Date(page.updatedAt).toLocaleDateString()}</td>
-                        <td className="p-3 text-right space-x-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingPage(page);
-                              setPageTitle(page.title);
-                              setPageSlug(page.slug);
-                              setPageContent(page.content);
-                              setPagePublished(page.isPublished);
-                              setShowPageModal(true);
-                            }}
-                            className="p-1 text-slate-400 hover:text-white"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <a
-                            href={`#page/${page.slug}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-1 text-slate-400 hover:text-emerald-400 inline-block"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
-                        </td>
-                      </tr>
-                    ))}
+                    {customPages.map(page => {
+                      const urls = buildPublicUrl('page', page.slug);
+                      const isCopied = pageCopiedSlug === page.slug;
+                      return (
+                        <tr key={page.slug} className="hover:bg-slate-900/50 transition-colors">
+                          <td className="p-3.5">
+                            <div className="font-semibold text-white">{page.title}</div>
+                            {page.seoTitle && page.seoTitle !== page.title && (
+                              <div className="text-[10px] text-slate-500 mt-0.5 truncate max-w-xs">
+                                SEO: {page.seoTitle}
+                              </div>
+                            )}
+                          </td>
+                          <td className="p-3.5">
+                            <div className="flex items-center gap-1.5 font-mono text-emerald-400 text-xs">
+                              <span>/pages/{page.slug}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyPageUrl(page.slug)}
+                                title="Copy public link"
+                                className="p-1 text-slate-400 hover:text-white transition-colors"
+                              >
+                                {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                            <div className="text-[10px] text-slate-500">Public Route</div>
+                          </td>
+                          <td className="p-3.5">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                page.isPublished
+                                  ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                                  : 'bg-slate-800 text-slate-400 border border-slate-700'
+                              }`}
+                            >
+                              {page.isPublished ? 'PUBLISHED' : 'DRAFT'}
+                            </span>
+                          </td>
+                          <td className="p-3.5 text-slate-400 text-[11px]">
+                            {page.showInFooter && page.showInHeader
+                              ? 'Header & Footer'
+                              : page.showInFooter
+                              ? 'Footer Only'
+                              : page.showInHeader
+                              ? 'Header Only'
+                              : 'Hidden / Standalone'}
+                          </td>
+                          <td className="p-3.5 text-slate-500 text-[11px]">
+                            {new Date(page.updatedAt || Date.now()).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })}
+                          </td>
+                          <td className="p-3.5 text-right space-x-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleCopyPageUrl(page.slug)}
+                              title="Copy URL"
+                              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors inline-block"
+                            >
+                              {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                            </button>
+                            <a
+                              href={`#pages/${page.slug}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Preview Live Page"
+                              className="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded-lg transition-colors inline-block"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingPage(page);
+                                setPageTitle(page.title);
+                                setPageSlug(page.slug);
+                                setPageIsSlugCustom(true);
+                                setPageContent(page.content);
+                                setPageFeaturedImage(page.featuredImageUrl || '');
+                                setPageSeoTitle(page.seoTitle || page.metaTitle || '');
+                                setPageMetaDesc(page.metaDescription || '');
+                                setPagePublished(page.isPublished);
+                                setPageShowInFooter(page.showInFooter);
+                                setPageShowInHeader(page.showInHeader || false);
+                                setShowPageModal(true);
+                              }}
+                              title="Edit Page"
+                              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors inline-block"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePage(page.slug)}
+                              title="Delete Page"
+                              className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors inline-block"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* 4.5. BLOG POSTS MANAGEMENT */}
+          {activeTab === 'blog_posts' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl font-bold font-serif text-white">Blog Posts & Articles</h1>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Publish guides, reviews, and e-commerce articles with automatic SEO URL slugs, drafts, and rich metadata
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <a
+                    href="#blog"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 rounded-xl flex items-center gap-1.5 transition-colors"
+                  >
+                    <Eye className="w-4 h-4" />
+                    <span>View Public Blog</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingBlogPost(null);
+                      setPostTitle('');
+                      setPostSlug('');
+                      setPostIsSlugCustom(false);
+                      setPostExcerpt('');
+                      setPostBodyContent('');
+                      setPostFeaturedImage('');
+                      setPostAuthor('RONVEX Editorial');
+                      setPostPublicationDate(new Date().toISOString().split('T')[0]);
+                      setPostCategory('Guides');
+                      setPostTags('Smartwatch, Audio, Bangladesh');
+                      setPostSeoTitle('');
+                      setPostMetaDesc('');
+                      setPostPublished(true);
+                      setShowBlogPostModal(true);
+                    }}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white rounded-xl flex items-center gap-1.5 shadow-sm transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Create New Post</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                <div className="relative flex-1 w-full">
+                  <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type="text"
+                    value={postSearch}
+                    onChange={e => setPostSearch(e.target.value)}
+                    placeholder="Search posts by title, excerpt, or tag..."
+                    className="w-full pl-10 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <select
+                    value={postFilterCategory}
+                    onChange={e => setPostFilterCategory(e.target.value)}
+                    className="w-full sm:w-auto px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-600"
+                  >
+                    <option value="ALL">All Categories</option>
+                    <option value="Guides">Guides</option>
+                    <option value="Product Focus">Product Focus</option>
+                    <option value="Affiliate Tips">Affiliate Tips</option>
+                    <option value="Company News">Company News</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Blog Posts Table */}
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-xs">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="bg-slate-900 text-slate-400 text-[11px] uppercase tracking-wider">
+                    <tr>
+                      <th className="p-3.5">Article</th>
+                      <th className="p-3.5">Public URL & Slug</th>
+                      <th className="p-3.5">Category & Author</th>
+                      <th className="p-3.5">Publication Date</th>
+                      <th className="p-3.5">Status</th>
+                      <th className="p-3.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {blogPosts
+                      .filter(post => {
+                        const matchesSearch =
+                          postSearch === '' ||
+                          post.title.toLowerCase().includes(postSearch.toLowerCase()) ||
+                          (post.excerpt && post.excerpt.toLowerCase().includes(postSearch.toLowerCase()));
+                        const matchesCategory =
+                          postFilterCategory === 'ALL' || post.category === postFilterCategory;
+                        return matchesSearch && matchesCategory;
+                      })
+                      .map(post => {
+                        const isCopied = postCopiedSlug === post.slug;
+                        return (
+                          <tr key={post.postId} className="hover:bg-slate-900/50 transition-colors">
+                            <td className="p-3.5">
+                              <div className="flex items-center gap-3">
+                                {post.featuredImageUrl ? (
+                                  <img
+                                    src={post.featuredImageUrl}
+                                    alt={post.title}
+                                    className="w-12 h-10 object-cover rounded-lg bg-slate-900 shrink-0 border border-slate-800"
+                                  />
+                                ) : (
+                                  <div className="w-12 h-10 rounded-lg bg-slate-900 flex items-center justify-center shrink-0 border border-slate-800 text-slate-500">
+                                    <BookOpen className="w-4 h-4" />
+                                  </div>
+                                )}
+                                <div>
+                                  <div className="font-semibold text-white max-w-sm truncate">{post.title}</div>
+                                  {post.excerpt && (
+                                    <div className="text-[10px] text-slate-400 line-clamp-1 max-w-sm mt-0.5">
+                                      {post.excerpt}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="p-3.5">
+                              <div className="flex items-center gap-1.5 font-mono text-emerald-400 text-xs">
+                                <span className="max-w-[160px] truncate">/blog/{post.slug}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyPostUrl(post.slug)}
+                                  title="Copy public link"
+                                  className="p-1 text-slate-400 hover:text-white transition-colors"
+                                >
+                                  {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                </button>
+                              </div>
+                            </td>
+                            <td className="p-3.5">
+                              <span className="px-2 py-0.5 bg-slate-900 border border-slate-800 text-slate-300 rounded text-[10px] font-medium">
+                                {post.category || 'General'}
+                              </span>
+                              <div className="text-[10px] text-slate-400 mt-1">{post.author}</div>
+                            </td>
+                            <td className="p-3.5 text-slate-400 text-[11px]">
+                              {new Date(post.publicationDate || post.createdAt).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                              })}
+                            </td>
+                            <td className="p-3.5">
+                              <span
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  post.isPublished
+                                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                                    : 'bg-slate-800 text-slate-400 border border-slate-700'
+                                }`}
+                              >
+                                {post.isPublished ? 'PUBLISHED' : 'DRAFT'}
+                              </span>
+                            </td>
+                            <td className="p-3.5 text-right space-x-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleCopyPostUrl(post.slug)}
+                                title="Copy URL"
+                                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors inline-block"
+                              >
+                                {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                              </button>
+                              <a
+                                href={`#blog/${post.slug}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="Preview Live Article"
+                                className="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded-lg transition-colors inline-block"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingBlogPost(post);
+                                  setPostTitle(post.title);
+                                  setPostSlug(post.slug);
+                                  setPostIsSlugCustom(true);
+                                  setPostExcerpt(post.excerpt || '');
+                                  setPostBodyContent(post.bodyContent);
+                                  setPostFeaturedImage(post.featuredImageUrl || '');
+                                  setPostAuthor(post.author || 'RONVEX Editorial');
+                                  setPostPublicationDate(post.publicationDate || new Date().toISOString().split('T')[0]);
+                                  setPostCategory(post.category || 'Guides');
+                                  setPostTags(post.tags ? post.tags.join(', ') : '');
+                                  setPostSeoTitle(post.seoTitle || '');
+                                  setPostMetaDesc(post.metaDescription || '');
+                                  setPostPublished(post.isPublished);
+                                  setShowBlogPostModal(true);
+                                }}
+                                title="Edit Post"
+                                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors inline-block"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteBlogPost(post.postId, post.title)}
+                                title="Delete Post"
+                                className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors inline-block"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                   </tbody>
                 </table>
               </div>
@@ -1927,15 +2413,25 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                   <h1 className="text-2xl font-bold font-serif text-white">SEO & Search Optimization</h1>
                   <p className="text-xs text-slate-400 mt-1">Configure search engine titles, descriptions, and OpenGraph share previews</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleSaveSEOSettings}
-                  disabled={savingCMS}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white rounded-xl flex items-center gap-2"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>Save SEO Settings</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleGenerateSitemap}
+                    className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-emerald-400 border border-slate-700 rounded-xl flex items-center gap-1.5 transition-colors"
+                  >
+                    <Globe className="w-4 h-4" />
+                    <span>View / Export XML Sitemap</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveSEOSettings}
+                    disabled={savingCMS}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white rounded-xl flex items-center gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Save SEO Settings</span>
+                  </button>
+                </div>
               </div>
 
               <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 space-y-4">
@@ -3210,62 +3706,188 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
         </div>
       )}
 
-      {/* Page Modal */}
+      {/* ---------------- CUSTOM PAGE MODAL ---------------- */}
       {showPageModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
-          <div className="w-full max-w-lg bg-slate-950 border border-slate-800 rounded-2xl p-6 shadow-2xl relative my-8">
-            <h3 className="text-base font-bold text-white mb-4">
-              {editingPage ? 'Edit Custom Page' : 'Create Custom Page'}
-            </h3>
-            <form onSubmit={handleSavePage} className="space-y-3">
+          <div className="w-full max-w-2xl bg-slate-950 border border-slate-800 rounded-2xl p-6 shadow-2xl relative my-8 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Page Title</label>
+                <h3 className="text-base font-bold text-white">
+                  {editingPage ? 'Edit Custom Page' : 'Create New Custom Page'}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Static and informational documentation with SEO metadata and draft control
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPageModal(false)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSavePage} className="space-y-4">
+              {/* Title */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Page Title *
+                </label>
                 <input
                   type="text"
                   value={pageTitle}
-                  onChange={e => {
-                    setPageTitle(e.target.value);
-                    if (!editingPage) {
-                      setPageSlug(e.target.value.toLowerCase().replace(/[^a-z0-9_-]+/g, '-'));
-                    }
-                  }}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                  onChange={e => handlePageTitleChange(e.target.value)}
+                  placeholder="e.g. Warranty & Quality Assurance"
+                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-600"
                   required
                 />
               </div>
+
+              {/* Slug URL with auto-generation and live preview */}
+              <div className="bg-slate-900/70 border border-slate-800 p-3.5 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-slate-300">
+                    URL Slug
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleRegeneratePageSlug}
+                    className="text-[11px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-medium"
+                    title="Regenerate slug from current title"
+                  >
+                    <RotateCw className="w-3 h-3" />
+                    <span>Regenerate from Title</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500 font-mono select-none">/pages/</span>
+                  <input
+                    type="text"
+                    value={pageSlug}
+                    onChange={e => handlePageSlugChange(e.target.value)}
+                    placeholder="warranty-quality-assurance"
+                    className="flex-1 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-emerald-300 font-mono focus:outline-none focus:border-emerald-600"
+                    required
+                  />
+                </div>
+
+                {/* Live URL Preview */}
+                <div className="text-[11px] text-slate-400 flex items-center gap-1.5 pt-1">
+                  <span className="text-slate-500">Live Preview:</span>
+                  <span className="font-mono text-emerald-400">
+                    {buildPublicUrl('page', pageSlug || 'my-page').hashPath}
+                  </span>
+                  {pageIsSlugCustom && (
+                    <span className="text-[10px] px-1.5 py-0.2 bg-slate-800 text-amber-300 rounded ml-auto">
+                      Custom slug
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Featured Image */}
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Slug URL (/page/:slug)</label>
+                <label className="block text-xs font-medium text-slate-400 mb-1">
+                  Featured Header Image URL (Optional)
+                </label>
                 <input
                   type="text"
-                  value={pageSlug}
-                  onChange={e => setPageSlug(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
-                  required
+                  value={pageFeaturedImage}
+                  onChange={e => setPageFeaturedImage(e.target.value)}
+                  placeholder="https://... or /src/assets/images/..."
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono focus:outline-none focus:border-emerald-600"
                 />
               </div>
+
+              {/* Page Content */}
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Page Content (Markdown / Text)</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Page Content (Markdown / Formatted Text) *
+                </label>
                 <textarea
                   rows={8}
                   value={pageContent}
                   onChange={e => setPageContent(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
+                  placeholder="## Heading&#10;&#10;Write your documentation or policy content here..."
+                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono placeholder-slate-600 focus:outline-none focus:border-emerald-600 leading-relaxed"
                   required
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="pagePublished"
-                  checked={pagePublished}
-                  onChange={e => setPagePublished(e.target.checked)}
-                  className="rounded text-emerald-600 focus:ring-0"
-                />
-                <label htmlFor="pagePublished" className="text-xs text-slate-300">
-                  Publish page immediately
-                </label>
+
+              {/* SEO Title & Description */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-800">
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">
+                    SEO Title (Browser & Social Cards)
+                  </label>
+                  <input
+                    type="text"
+                    value={pageSeoTitle}
+                    onChange={e => setPageSeoTitle(e.target.value)}
+                    placeholder="Defaults to page title"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">
+                    Meta Description
+                  </label>
+                  <input
+                    type="text"
+                    value={pageMetaDesc}
+                    onChange={e => setPageMetaDesc(e.target.value)}
+                    placeholder="1-2 sentences for Google search snippet"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                  />
+                </div>
               </div>
-              <div className="flex items-center justify-end gap-2 pt-3">
+
+              {/* Placements and Publication checkboxes */}
+              <div className="bg-slate-900/50 border border-slate-800 p-3.5 rounded-xl space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="pagePublishedCheck"
+                    checked={pagePublished}
+                    onChange={e => setPagePublished(e.target.checked)}
+                    className="rounded text-emerald-600 focus:ring-0"
+                  />
+                  <label htmlFor="pagePublishedCheck" className="text-xs text-white font-semibold">
+                    Publish this page immediately (visible to visitors)
+                  </label>
+                </div>
+                {!pagePublished && (
+                  <p className="text-[11px] text-amber-400 pl-5">
+                    Page will be saved as Draft. Visitors cannot access it.
+                  </p>
+                )}
+
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-2 border-t border-slate-800/80">
+                  <label className="flex items-center gap-2 text-xs text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={pageShowInFooter}
+                      onChange={e => setPageShowInFooter(e.target.checked)}
+                      className="rounded text-emerald-600 focus:ring-0"
+                    />
+                    <span>Show link in footer customer service links</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={pageShowInHeader}
+                      onChange={e => setPageShowInHeader(e.target.checked)}
+                      className="rounded text-emerald-600 focus:ring-0"
+                    />
+                    <span>Show in top header menu</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowPageModal(false)}
@@ -3275,12 +3897,343 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-sm transition-colors"
                 >
-                  Save Page
+                  {editingPage ? 'Update Page' : 'Save & Publish Page'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ---------------- BLOG POST MODAL ---------------- */}
+      {showBlogPostModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+          <div className="w-full max-w-3xl bg-slate-950 border border-slate-800 rounded-2xl p-6 shadow-2xl relative my-8 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+              <div>
+                <h3 className="text-base font-bold text-white">
+                  {editingBlogPost ? 'Edit Blog Article' : 'Write New Blog Article'}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Publish buyer’s guides, reviews, and tech stories with automatic SEO slugs
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBlogPostModal(false)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBlogPost} className="space-y-4">
+              {/* Article Title */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Article Title *
+                </label>
+                <input
+                  type="text"
+                  value={postTitle}
+                  onChange={e => handlePostTitleChange(e.target.value)}
+                  placeholder="e.g. Top 5 ANC Earbuds For Commuters in Dhaka"
+                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-600 font-serif"
+                  required
+                />
+              </div>
+
+              {/* Automatic Slug URL and Live Preview */}
+              <div className="bg-slate-900/70 border border-slate-800 p-3.5 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-slate-300">
+                    Article URL Slug
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleRegeneratePostSlug}
+                    className="text-[11px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-medium"
+                    title="Regenerate slug from current article title"
+                  >
+                    <RotateCw className="w-3 h-3" />
+                    <span>Regenerate from Title</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500 font-mono select-none">/blog/</span>
+                  <input
+                    type="text"
+                    value={postSlug}
+                    onChange={e => handlePostSlugChange(e.target.value)}
+                    placeholder="top-5-anc-earbuds-for-commuters-in-dhaka"
+                    className="flex-1 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-emerald-300 font-mono focus:outline-none focus:border-emerald-600"
+                    required
+                  />
+                </div>
+
+                {/* Live URL Preview */}
+                <div className="text-[11px] text-slate-400 flex items-center gap-1.5 pt-1">
+                  <span className="text-slate-500">Live Preview:</span>
+                  <span className="font-mono text-emerald-400">
+                    {buildPublicUrl('post', postSlug || 'my-article').hashPath}
+                  </span>
+                  {postIsSlugCustom && (
+                    <span className="text-[10px] px-1.5 py-0.2 bg-slate-800 text-amber-300 rounded ml-auto">
+                      Custom slug
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Metadata Row: Category, Author, Publication Date */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Category</label>
+                  <select
+                    value={postCategory}
+                    onChange={e => setPostCategory(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-600"
+                  >
+                    <option value="Guides">Guides</option>
+                    <option value="Product Focus">Product Focus</option>
+                    <option value="Affiliate Tips">Affiliate Tips</option>
+                    <option value="Company News">Company News</option>
+                    <option value="Tech Reviews">Tech Reviews</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Author Name</label>
+                  <input
+                    type="text"
+                    value={postAuthor}
+                    onChange={e => setPostAuthor(e.target.value)}
+                    placeholder="e.g. RONVEX Editorial"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Publication Date</label>
+                  <input
+                    type="date"
+                    value={postPublicationDate}
+                    onChange={e => setPostPublicationDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Featured Image URL */}
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">
+                  Featured Cover Image URL
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={postFeaturedImage}
+                    onChange={e => setPostFeaturedImage(e.target.value)}
+                    placeholder="https://... or /src/assets/images/..."
+                    className="flex-1 px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setPostFeaturedImage(BUNDLED_IMAGES.smartwatch)}
+                    className="px-2.5 py-2 bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 rounded-xl"
+                  >
+                    Preset 1
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPostFeaturedImage(BUNDLED_IMAGES.earbuds)}
+                    className="px-2.5 py-2 bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 rounded-xl"
+                  >
+                    Preset 2
+                  </button>
+                </div>
+              </div>
+
+              {/* Excerpt */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Excerpt (Summary for Search & Card Previews)
+                </label>
+                <textarea
+                  rows={2}
+                  value={postExcerpt}
+                  onChange={e => setPostExcerpt(e.target.value)}
+                  placeholder="A concise 1-2 sentence teaser about the article..."
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-600"
+                />
+              </div>
+
+              {/* Main Body Content */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Article Body (Markdown / Text) *
+                </label>
+                <textarea
+                  rows={9}
+                  value={postBodyContent}
+                  onChange={e => setPostBodyContent(e.target.value)}
+                  placeholder="## Introduction&#10;&#10;Write the full article body with markdown headers, lists, and takeaways..."
+                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono placeholder-slate-600 focus:outline-none focus:border-emerald-600 leading-relaxed"
+                  required
+                />
+              </div>
+
+              {/* Tags & SEO fields */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-slate-800">
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Tags (Comma-separated)</label>
+                  <input
+                    type="text"
+                    value={postTags}
+                    onChange={e => setPostTags(e.target.value)}
+                    placeholder="Smartwatch, Bluetooth, Guide"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">SEO Title (Optional)</label>
+                  <input
+                    type="text"
+                    value={postSeoTitle}
+                    onChange={e => setPostSeoTitle(e.target.value)}
+                    placeholder="Custom HTML title tag"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Meta Description</label>
+                  <input
+                    type="text"
+                    value={postMetaDesc}
+                    onChange={e => setPostMetaDesc(e.target.value)}
+                    placeholder="Search snippet description"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                  />
+                </div>
+              </div>
+
+              {/* Draft toggle */}
+              <div className="bg-slate-900/50 border border-slate-800 p-3.5 rounded-xl flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-semibold text-white">Publishing Status</div>
+                  <div className="text-[11px] text-slate-400">
+                    {postPublished
+                      ? 'Post will immediately go live on the public blog.'
+                      : 'Saved as Draft (hidden from visitors until published).'}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="postPublishedCheck"
+                    checked={postPublished}
+                    onChange={e => setPostPublished(e.target.checked)}
+                    className="rounded text-emerald-600 focus:ring-0"
+                  />
+                  <label htmlFor="postPublishedCheck" className="text-xs text-slate-300">
+                    Publish Live
+                  </label>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowBlogPostModal(false)}
+                  className="px-4 py-2 text-xs text-slate-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-sm transition-colors"
+                >
+                  {editingBlogPost ? 'Update Article' : 'Save & Publish Article'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ---------------- XML SITEMAP MODAL ---------------- */}
+      {showSitemapModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+          <div className="w-full max-w-2xl bg-slate-950 border border-slate-800 rounded-2xl p-6 shadow-2xl relative my-8">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+              <div>
+                <h3 className="text-base font-bold text-white">XML Sitemap (Sitemap.xml)</h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Dynamic sitemap index of active products, published custom pages, and public articles.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSitemapModal(false)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="p-3 bg-emerald-950/60 border border-emerald-800/80 rounded-xl text-xs text-emerald-300 flex items-center justify-between">
+                <div>
+                  <span className="font-semibold">Sitemap Compiled:</span>{' '}
+                  {productList.filter(p => p.isActive).length} Products,{' '}
+                  {customPages.filter(p => p.isPublished).length} Pages,{' '}
+                  {blogPosts.filter(p => p.isPublished).length} Blog Posts.
+                  <div className="text-[10px] text-emerald-400 mt-0.5">Drafts and unpublished items are excluded.</div>
+                </div>
+              </div>
+
+              <textarea
+                rows={12}
+                readOnly
+                value={sitemapXmlContent}
+                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-[11px] text-slate-300 font-mono select-all focus:outline-none"
+              />
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+                <span className="text-xs text-slate-500">Standard sitemap.xml format</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(sitemapXmlContent);
+                      setSitemapCopied(true);
+                      setTimeout(() => setSitemapCopied(false), 2000);
+                    }}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  >
+                    {sitemapCopied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                    <span>{sitemapCopied ? 'Copied!' : 'Copy Sitemap XML'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const blob = new Blob([sitemapXmlContent], { type: 'application/xml' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = 'sitemap.xml';
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold transition-colors"
+                  >
+                    Download sitemap.xml
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

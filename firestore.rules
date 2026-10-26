@@ -180,6 +180,12 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    // CMS Editorial Articles & Blog Posts
+    match /posts/{postId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
     // Product Categories
     match /categories/{catId} {
       allow read: if true;

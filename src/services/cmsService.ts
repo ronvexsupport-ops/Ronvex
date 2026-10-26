@@ -523,6 +523,22 @@ export class CMSService {
     return INITIAL_CUSTOM_PAGES;
   }
 
+  static async getPageBySlug(slug: string): Promise<CustomPage | null> {
+    const cleanSlug = slug.toLowerCase().trim();
+    try {
+      const snapDirect = await getDoc(doc(db, 'pages', cleanSlug));
+      if (snapDirect.exists()) {
+        return snapDirect.data() as CustomPage;
+      }
+      const allPages = await this.getPages();
+      const found = allPages.find(p => p.slug.toLowerCase() === cleanSlug);
+      if (found) return found;
+    } catch (e) {
+      console.warn('CMSService: Error fetching page by slug:', e);
+    }
+    return INITIAL_CUSTOM_PAGES.find(p => p.slug.toLowerCase() === cleanSlug) || null;
+  }
+
   static async savePage(page: CustomPage, adminEmail: string, adminUid: string): Promise<void> {
     const payload = {
       ...page,

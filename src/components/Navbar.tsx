@@ -50,8 +50,14 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, categor
       } else {
         onNavigate('shop');
       }
+    } else if (clean.startsWith('pages/')) {
+      onNavigate('page', clean.replace('pages/', ''));
     } else if (clean.startsWith('page/')) {
       onNavigate('page', clean.replace('page/', ''));
+    } else if (clean.startsWith('blog/')) {
+      onNavigate('blog-post', clean.replace('blog/', ''));
+    } else if (clean === 'blog') {
+      onNavigate('blog');
     } else if (clean === 'track-order') {
       onNavigate('track-order');
     } else if (clean === 'admin' || clean === 'admin-portal') {
