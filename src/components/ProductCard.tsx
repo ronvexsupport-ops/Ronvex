@@ -59,39 +59,39 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       </a>
 
       {/* Product Content Details */}
-      <div className="p-4 flex flex-col flex-1 justify-between gap-3">
+      <div className="p-2.5 sm:p-4 flex flex-col flex-1 justify-between gap-2 sm:gap-3">
         <div>
           {/* Clean Unboxed Metadata with · separator */}
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
-            <span>{product.categoryName}</span>
+          <div className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs text-slate-500 mb-1 truncate">
+            <span className="truncate">{product.categoryName}</span>
             <span aria-hidden="true">·</span>
-            <span>{product.stockQuantity > 0 ? 'In Stock' : 'Out of Stock'}</span>
+            <span className="shrink-0">{product.stockQuantity > 0 ? 'In Stock' : 'Out'}</span>
           </div>
 
-          <h3 className="line-clamp-1">
+          <h3 className="line-clamp-2 min-h-[2.2rem] sm:min-h-0">
             <a
               href={productHref}
               onClick={handleCardClick}
-              className="text-sm font-semibold text-slate-900 group-hover:text-slate-700 transition-colors cursor-pointer block"
+              className="text-xs sm:text-sm font-semibold text-slate-900 group-hover:text-slate-700 transition-colors cursor-pointer block leading-tight sm:leading-snug"
             >
               {product.name}
             </a>
           </h3>
 
-          <p className="text-xs text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+          <p className="hidden sm:block text-xs text-slate-500 line-clamp-2 mt-1 leading-relaxed">
             {product.description}
           </p>
         </div>
 
         {/* Pricing & Add to Cart Footer */}
-        <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+        <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
           <div>
-            <div className="text-base font-bold text-slate-950 font-mono tabular-nums">
+            <div className="text-sm sm:text-base font-bold text-slate-950 font-mono tabular-nums">
               {PricingEngine.formatBDT(displayPrice)}
             </div>
             {isAffiliateView && customSellingPrice !== undefined && (
-              <div className="text-[10px] text-emerald-700 font-medium">
-                Affiliate Margin: +{PricingEngine.formatBDT(PricingEngine.calculateAffiliateMargin(displayPrice, product.adminBasePrice))}
+              <div className="text-[9px] sm:text-[10px] text-emerald-700 font-medium">
+                Margin: +{PricingEngine.formatBDT(PricingEngine.calculateAffiliateMargin(displayPrice, product.adminBasePrice))}
               </div>
             )}
           </div>
@@ -99,13 +99,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <button
             onClick={() => addToCart(product, 1, displayPrice)}
             disabled={product.stockQuantity === 0}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
+            className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-xs font-semibold rounded-lg transition-colors whitespace-nowrap w-full sm:w-auto cursor-pointer ${
               product.stockQuantity > 0
                 ? 'bg-slate-900 text-white hover:bg-slate-800'
                 : 'bg-slate-100 text-slate-400 cursor-not-allowed'
             }`}
           >
-            <ShoppingBag className="w-3.5 h-3.5" />
+            <ShoppingBag className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
             <span>Add</span>
           </button>
         </div>

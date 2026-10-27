@@ -90,7 +90,7 @@ export const ShopPage: React.FC<ShopPageProps> = ({
   }, [products, selectedCategory, searchQuery, sortBy]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
       {/* Page Title & Search Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-200 pb-6">
         <div>
@@ -168,7 +168,7 @@ export const ShopPage: React.FC<ShopPageProps> = ({
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-6">
           {filteredProducts.map(product => (
             <ProductCard
               key={product.productId}

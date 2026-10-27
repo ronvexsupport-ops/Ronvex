@@ -146,7 +146,7 @@ export const HomePage: React.FC<HomePageProps> = ({ products, onSelectProduct, o
 
       {/* Featured Collection Section */}
       {cms.featuredSection.enabled && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+        <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 space-y-8">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200 pb-4">
             <div>
               <div className="text-xs uppercase tracking-wider text-slate-500 font-medium">Curated Highlights</div>
@@ -168,8 +168,8 @@ export const HomePage: React.FC<HomePageProps> = ({ products, onSelectProduct, o
             </button>
           </div>
 
-          {/* 4-column responsive grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* 2-column mobile, 4-column desktop grid */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-6">
             {featuredProducts.map(product => (
               <ProductCard
                 key={product.productId}
