@@ -46,7 +46,7 @@ export const HeroProductSlider: React.FC<HeroProductSliderProps> = ({
 
   if (slides.length === 0) {
     return (
-      <div className="relative min-h-[360px] lg:min-h-full bg-slate-900 flex items-center justify-center p-8 text-slate-400 text-xs">
+      <div className="relative min-h-[460px] lg:min-h-full bg-slate-900 flex items-center justify-center p-8 text-slate-400 text-xs">
         No products available to showcase.
       </div>
     );
@@ -76,20 +76,39 @@ export const HeroProductSlider: React.FC<HeroProductSliderProps> = ({
     <div
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
-      className="relative min-h-[440px] sm:min-h-[480px] lg:min-h-full bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 flex flex-col justify-between p-6 sm:p-8 lg:p-10 overflow-hidden border-t lg:border-t-0 lg:border-l border-slate-800/80 group"
+      className="relative min-h-[480px] sm:min-h-[540px] lg:min-h-full w-full flex flex-col justify-between overflow-hidden border-t lg:border-t-0 lg:border-l border-slate-800/80 group select-none"
     >
-      {/* Decorative ambient glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+      {/* Full-Bleed Product Image covering the entire space */}
+      <div className="absolute inset-0 w-full h-full overflow-hidden bg-slate-950">
+        <img
+          key={currentProduct.productId}
+          src={imageUrl}
+          alt={currentProduct.name}
+          referrerPolicy="no-referrer"
+          className="w-full h-full object-cover object-top sm:object-center transition-transform duration-700 ease-out group-hover:scale-105 animate-fade-in"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = ImageService.getCategoryFallback(currentProduct.categoryId);
+          }}
+        />
 
-      {/* Top Header Row of Slider: Category Badge, Slide Counter & Arrow Controls */}
-      <div className="relative z-10 flex items-center justify-between gap-3">
+        {/* Artistic Gradient Overlays for Guaranteed High Contrast & Readability */}
+        {/* Top Scrim */}
+        <div className="absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-slate-950/90 via-slate-950/40 to-transparent pointer-events-none" />
+        {/* Left Blend Scrim matching Hero Left section */}
+        <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-slate-950 via-slate-950/50 to-transparent pointer-events-none hidden lg:block" />
+        {/* Bottom Rich Scrim for Glass Card */}
+        <div className="absolute inset-x-0 bottom-0 h-80 sm:h-96 bg-gradient-to-t from-slate-950 via-slate-950/85 to-transparent pointer-events-none" />
+      </div>
+
+      {/* Top Header Row (Floating): Category Badge, Slide Counter & Arrow Controls */}
+      <div className="relative z-20 p-5 sm:p-7 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-white/10 text-slate-200 backdrop-blur-md border border-white/10 shadow-xs">
-            <Tag className="w-3 h-3 text-emerald-400" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-950/75 text-slate-100 backdrop-blur-md border border-white/20 shadow-md">
+            <Tag className="w-3.5 h-3.5 text-emerald-400" />
             <span>{currentProduct.categoryName || 'Featured Collection'}</span>
           </span>
           {checkedProducts.length > 0 && (
-            <span className="text-[10px] font-medium text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded-full hidden sm:inline-block">
+            <span className="text-[11px] font-semibold text-emerald-300 bg-emerald-950/85 border border-emerald-500/40 backdrop-blur-md px-2.5 py-1 rounded-full shadow-xs hidden sm:inline-block">
               Selected Item
             </span>
           )}
@@ -97,15 +116,15 @@ export const HeroProductSlider: React.FC<HeroProductSliderProps> = ({
 
         {/* Carousel controls */}
         {slides.length > 1 && (
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-mono text-slate-400 px-1 select-none">
+          <div className="flex items-center gap-1.5 bg-slate-950/75 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 shadow-md">
+            <span className="text-xs font-mono text-slate-200 px-1 font-bold">
               {currentIndex + 1} / {slides.length}
             </span>
             <button
               type="button"
               onClick={handlePrev}
               aria-label="Previous slide"
-              className="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95"
+              className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 text-white flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -113,7 +132,7 @@ export const HeroProductSlider: React.FC<HeroProductSliderProps> = ({
               type="button"
               onClick={handleNext}
               aria-label="Next slide"
-              className="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center justify-center transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95"
+              className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 text-white flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -121,67 +140,58 @@ export const HeroProductSlider: React.FC<HeroProductSliderProps> = ({
         )}
       </div>
 
-      {/* Center Image Showcase (Full image containment, 0% cropping) */}
+      {/* Middle Interactive Zone */}
       <div
         onClick={() => onSelectProduct(currentProduct)}
-        className="relative z-10 my-4 sm:my-6 w-full h-56 sm:h-72 lg:h-80 flex items-center justify-center p-2 cursor-pointer transition-transform duration-300 group-hover:scale-[1.02]"
-        title={`Click to view ${currentProduct.name}`}
-      >
-        <img
-          key={currentProduct.productId}
-          src={imageUrl}
-          alt={currentProduct.name}
-          referrerPolicy="no-referrer"
-          className="max-h-full max-w-full w-auto h-auto object-contain select-none filter drop-shadow-[0_20px_40px_rgba(0,0,0,0.7)] animate-fade-in"
-          onError={(e) => {
-            (e.target as HTMLImageElement).src = ImageService.getCategoryFallback(currentProduct.categoryId);
-          }}
-        />
-      </div>
+        className="flex-1 w-full relative z-10 cursor-pointer min-h-[120px]"
+        title={`View ${currentProduct.name}`}
+      />
 
-      {/* Bottom Section: Offer Title, Product Title, Price & Shop Now Button */}
-      <div className="relative z-10 space-y-4">
-        {/* Offer Title Banner */}
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-xs">
-            <Sparkles className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate max-w-[280px] sm:max-w-md">{displayOfferTitle}</span>
-          </span>
-        </div>
-
-        {/* Product Title */}
-        <h3
-          onClick={() => onSelectProduct(currentProduct)}
-          className="text-lg sm:text-2xl font-bold font-serif text-white tracking-tight line-clamp-1 cursor-pointer hover:text-emerald-300 transition-colors"
-        >
-          {currentProduct.name}
-        </h3>
-
-        {/* Pricing & CTA */}
-        <div className="pt-3 border-t border-slate-800/90 flex items-center justify-between gap-4">
-          <div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-white font-mono tabular-nums tracking-tight">
-              {PricingEngine.formatBDT(currentProduct.adminBasePrice)}
-            </div>
-            <div className="text-[11px] text-slate-400 font-medium">
-              VAT & Taxes Included
-            </div>
+      {/* Bottom Floating Glassmorphic Card: Offer Title, Product Title, Price & Shop Now Button */}
+      <div className="relative z-20 p-5 sm:p-7 space-y-3.5">
+        <div className="bg-slate-950/80 backdrop-blur-xl border border-white/15 p-4 sm:p-6 rounded-2xl shadow-2xl space-y-3.5 ring-1 ring-black/40">
+          {/* Offer Title Banner */}
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-xs">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span className="truncate max-w-[280px] sm:max-w-md">{displayOfferTitle}</span>
+            </span>
           </div>
 
-          <button
-            type="button"
+          {/* Product Title */}
+          <h3
             onClick={() => onSelectProduct(currentProduct)}
-            className="inline-flex items-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm rounded-xl shadow-lg hover:shadow-emerald-500/30 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer shrink-0"
+            className="text-lg sm:text-2xl font-bold font-serif text-white tracking-tight line-clamp-1 cursor-pointer hover:text-emerald-300 transition-colors"
           >
-            <ShoppingBag className="w-4 h-4" />
-            <span>Shop Now</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+            {currentProduct.name}
+          </h3>
+
+          {/* Pricing & CTA */}
+          <div className="pt-2.5 border-t border-white/10 flex items-center justify-between gap-4">
+            <div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-white font-mono tabular-nums tracking-tight">
+                {PricingEngine.formatBDT(currentProduct.adminBasePrice)}
+              </div>
+              <div className="text-[11px] text-slate-300 font-medium">
+                VAT & Taxes Included
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onSelectProduct(currentProduct)}
+              className="inline-flex items-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm rounded-xl shadow-xl hover:shadow-emerald-500/30 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer shrink-0"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              <span>Shop Now</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* Slide Indicator Dots */}
         {slides.length > 1 && (
-          <div className="flex items-center justify-center gap-1.5 pt-2">
+          <div className="flex items-center justify-center gap-2 pt-1">
             {slides.map((s, idx) => (
               <button
                 key={s.productId}
@@ -190,8 +200,8 @@ export const HeroProductSlider: React.FC<HeroProductSliderProps> = ({
                 aria-label={`Go to slide ${idx + 1}`}
                 className={`transition-all rounded-full cursor-pointer ${
                   idx === currentIndex
-                    ? 'w-6 h-1.5 bg-emerald-400'
-                    : 'w-1.5 h-1.5 bg-slate-700 hover:bg-slate-500'
+                    ? 'w-8 h-2 bg-emerald-400 shadow-sm'
+                    : 'w-2 h-2 bg-white/40 hover:bg-white/70'
                 }`}
               />
             ))}
