@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Search, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
 import { Product, ProductCategory } from '../types';
 import { ProductCard } from '../components/ProductCard';
+import { applySEO } from '../utils/seoUtils';
 
 interface ShopPageProps {
   products: Product[];
@@ -19,6 +20,15 @@ export const ShopPage: React.FC<ShopPageProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory || 'all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<'featured' | 'price-asc' | 'price-desc' | 'newest'>('featured');
+
+  useEffect(() => {
+    applySEO({
+      title: 'Shop All Collections',
+      seoTitle: 'Shop Collections | RONVEX',
+      metaDescription: 'Discover authentic collections, lawn suits, smart gadgets, and trending products at RONVEX.',
+      canonicalPath: '/#shop',
+    });
+  }, []);
 
   // Compute dynamic category list combining defined categories and product-assigned categories
   const categoryTabs = useMemo(() => {

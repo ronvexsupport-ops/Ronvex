@@ -44,9 +44,11 @@ function getCanonicalTag(): HTMLLinkElement {
 export function applySEO(options: PageMetaOptions): void {
   if (typeof document === 'undefined') return;
 
-  const resolvedTitle = options.seoTitle || options.title
-    ? `${options.seoTitle || options.title} | ${DEFAULT_BRAND}`
-    : `${DEFAULT_BRAND} | Premium Lifestyle Tech & Affiliate Platform`;
+  const baseTitle = options.seoTitle || options.title;
+  let resolvedTitle = `${DEFAULT_BRAND} | Premium Lifestyle Tech & Affiliate Platform`;
+  if (baseTitle) {
+    resolvedTitle = baseTitle.includes(DEFAULT_BRAND) ? baseTitle : `${baseTitle} | ${DEFAULT_BRAND}`;
+  }
 
   const resolvedDescription = options.metaDescription || DEFAULT_DESCRIPTION;
   const origin = window.location.origin;
@@ -105,7 +107,7 @@ export function generateSitemapXml(
   // Published Products
   products.filter(p => p.isActive).forEach(p => {
     urls.push({
-      loc: `${origin}/#product/${p.slug}`,
+      loc: `${origin}/#product/${p.slug || p.productId}`,
       lastmod: p.updatedAt ? p.updatedAt.split('T')[0] : now,
       changefreq: 'weekly',
       priority: '0.8',

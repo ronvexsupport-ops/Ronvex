@@ -16,12 +16,15 @@ import {
   X,
   ChevronDown,
   RotateCcw as ResetIcon,
+  Share2,
+  Copy,
 } from 'lucide-react';
 import { Product } from '../types';
 import { PricingEngine } from '../services/pricingEngine';
 import { useCart } from '../context/CartContext';
 import { ImageService, DEFAULT_FALLBACK_IMAGE } from '../services/imageService';
 import { ProductCard } from '../components/ProductCard';
+import { applySEO } from '../utils/seoUtils';
 
 interface ProductDetailPageProps {
   product: Product;
@@ -77,6 +80,34 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
   const displayPrice = customSellingPrice !== undefined ? customSellingPrice : product.adminBasePrice;
   const currentImage = resolvedImages[activeImageIndex] || resolvedImages[0];
+
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  // Apply dynamic document title, meta tags, and canonical link
+  useEffect(() => {
+    if (!product) return;
+    const cleanSlug = product.slug || product.productId;
+    applySEO({
+      title: product.name,
+      seoTitle: `${product.name} | RONVEX`,
+      metaDescription: product.description ? product.description.slice(0, 160) : `Shop ${product.name} at RONVEX. Authentic premium quality.`,
+      ogImage: resolvedImages[0],
+      canonicalPath: `/product/${cleanSlug}`,
+      type: 'product',
+    });
+  }, [product, resolvedImages]);
+
+  const handleCopyProductLink = async () => {
+    try {
+      const cleanSlug = product.slug || product.productId;
+      const fullUrl = `${window.location.origin}/#product/${cleanSlug}`;
+      await navigator.clipboard.writeText(fullUrl);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    } catch {
+      // fallback
+    }
+  };
 
   // Keep index within bounds if product changes
   useEffect(() => {
@@ -284,14 +315,34 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
         <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-24">
           {/* Header & Meta */}
           <div className="space-y-2 border-b border-slate-200 pb-5">
-            <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-              <span className="font-semibold text-slate-900">{product.categoryName || 'General Catalog'}</span>
-              <span aria-hidden="true">·</span>
-              <span className="font-mono text-slate-400">SKU: {product.productId}</span>
-              <span aria-hidden="true">·</span>
-              <span className={product.stockQuantity > 0 ? 'text-emerald-700 font-semibold' : 'text-rose-600 font-semibold'}>
-                {product.stockQuantity > 0 ? `${product.stockQuantity} in stock` : 'Out of Stock'}
-              </span>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 font-medium">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-slate-900">{product.categoryName || 'General Catalog'}</span>
+                <span aria-hidden="true">·</span>
+                <span className="font-mono text-slate-400">SKU: {product.productId}</span>
+                <span aria-hidden="true">·</span>
+                <span className={product.stockQuantity > 0 ? 'text-emerald-700 font-semibold' : 'text-rose-600 font-semibold'}>
+                  {product.stockQuantity > 0 ? `${product.stockQuantity} in stock` : 'Out of Stock'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyProductLink}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors cursor-pointer"
+                title="Copy unique link to this product"
+              >
+                {copiedLink ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span className="text-emerald-700 font-semibold">Link Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Copy Link</span>
+                  </>
+                )}
+              </button>
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-950 font-serif">

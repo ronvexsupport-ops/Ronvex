@@ -3,6 +3,7 @@ import { ArrowRight, ShieldCheck, Zap, Award, Sparkles, Truck, CreditCard, Trend
 import { Product, HomepageCMSConfig } from '../types';
 import { ProductCard } from '../components/ProductCard';
 import { CMSService, DEFAULT_HOMEPAGE_CMS } from '../services/cmsService';
+import { applySEO } from '../utils/seoUtils';
 
 interface HomePageProps {
   products: Product[];
@@ -14,6 +15,13 @@ export const HomePage: React.FC<HomePageProps> = ({ products, onSelectProduct, o
   const [cms, setCms] = useState<HomepageCMSConfig>(DEFAULT_HOMEPAGE_CMS);
 
   useEffect(() => {
+    applySEO({
+      title: 'RONVEX',
+      seoTitle: 'RONVEX | Premium Lifestyle Tech & E-Commerce Platform',
+      metaDescription: 'Shop authentic smartwatches, lawn suits, and precision electronics with Cash on Delivery across Bangladesh.',
+      canonicalPath: '/',
+    });
+
     const fetchCMS = async () => {
       try {
         const config = await CMSService.getHomepageConfig();

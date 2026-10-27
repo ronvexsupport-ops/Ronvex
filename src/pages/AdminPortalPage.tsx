@@ -203,6 +203,8 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [prodName, setProdName] = useState('');
   const [prodSlug, setProdSlug] = useState('');
+  const [prodIsSlugCustom, setProdIsSlugCustom] = useState(false);
+  const [prodCopiedSlug, setProdCopiedSlug] = useState<string | null>(null);
   const [prodDesc, setProdDesc] = useState('');
   const [prodCategory, setProdCategory] = useState('wearables');
   const [prodCategoryName, setProdCategoryName] = useState('Smart Wearables');
@@ -563,6 +565,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     setEditingProduct(null);
     setProdName('');
     setProdSlug('');
+    setProdIsSlugCustom(false);
     setProdDesc('');
     const defaultCat = categories[0] || { categoryId: 'wearables', name: 'Smart Wearables' };
     setProdCategory(defaultCat.categoryId);
@@ -578,7 +581,8 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
   const openEditProductModal = (p: Product) => {
     setEditingProduct(p);
     setProdName(p.name);
-    setProdSlug(p.slug);
+    setProdSlug(p.slug || generateSlug(p.name));
+    setProdIsSlugCustom(true);
     setProdDesc(p.description);
     setProdCategory(p.categoryId);
     setProdCategoryName(p.categoryName);
@@ -589,6 +593,38 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     setProdImageUrl(firstImg || DEFAULT_FALLBACK_IMAGE);
     setProdAdditionalImages(restImgs || []);
     setShowProductModal(true);
+  };
+
+  const handleProdNameChange = (name: string) => {
+    setProdName(name);
+    if (!prodIsSlugCustom) {
+      const existingSlugs = productList
+        .filter(p => !editingProduct || p.productId !== editingProduct.productId)
+        .map(p => p.slug || p.productId);
+      const generated = resolveUniqueSlug(generateSlug(name), existingSlugs, editingProduct?.slug);
+      setProdSlug(generated);
+    }
+  };
+
+  const handleRegenerateProdSlug = () => {
+    const existingSlugs = productList
+      .filter(p => !editingProduct || p.productId !== editingProduct.productId)
+      .map(p => p.slug || p.productId);
+    const generated = resolveUniqueSlug(generateSlug(prodName), existingSlugs, editingProduct?.slug);
+    setProdSlug(generated);
+    setProdIsSlugCustom(false);
+  };
+
+  const handleCopyProductPublicLink = async (p: Product) => {
+    try {
+      const slug = p.slug || p.productId;
+      const url = `${window.location.origin}/#product/${slug}`;
+      await navigator.clipboard.writeText(url);
+      setProdCopiedSlug(p.productId);
+      setTimeout(() => setProdCopiedSlug(null), 2500);
+    } catch {
+      // fallback
+    }
   };
 
   const handleProductImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -631,7 +667,11 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     }
 
     const productId = editingProduct ? editingProduct.productId : `prod_${Date.now()}`;
-    const cleanSlug = prodSlug.trim() || prodName.toLowerCase().replace(/[^a-z0-9_-]+/g, '-');
+    const rawSlug = prodSlug.trim() || generateSlug(prodName.trim());
+    const existingSlugs = productList
+      .filter(p => !editingProduct || p.productId !== editingProduct.productId)
+      .map(p => p.slug || p.productId);
+    const cleanSlug = resolveUniqueSlug(normalizeSlug(rawSlug), existingSlugs, editingProduct?.slug);
 
     // Find category name
     const foundCat = categories.find(c => c.categoryId === prodCategory);
@@ -2524,7 +2564,21 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                           />
                           <div>
                             <div className="font-semibold text-white">{p.name}</div>
-                            <div className="text-[10px] text-slate-500 font-mono">/{p.slug}</div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-[10px] text-slate-500 font-mono">/#product/{p.slug || p.productId}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyProductPublicLink(p)}
+                                className="p-1 hover:text-white text-slate-400 transition-colors"
+                                title="Copy public link"
+                              >
+                                {prodCopiedSlug === p.productId ? (
+                                  <Check className="w-3 h-3 text-emerald-400" />
+                                ) : (
+                                  <Copy className="w-3 h-3" />
+                                )}
+                              </button>
+                            </div>
                           </div>
                         </td>
                         <td className="p-3">
@@ -2548,6 +2602,27 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                           </button>
                         </td>
                         <td className="p-3 text-right space-x-2 whitespace-nowrap">
+                          <a
+                            href={`/#product/${p.slug || p.productId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 text-slate-400 hover:text-emerald-400 bg-slate-900 hover:bg-slate-800 rounded-lg inline-block"
+                            title="View Public Product Page"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyProductPublicLink(p)}
+                            className="p-1.5 text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-lg inline-block"
+                            title="Copy Product Link"
+                          >
+                            {prodCopiedSlug === p.productId ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
                           <button
                             type="button"
                             onClick={() => openEditProductModal(p)}
@@ -3355,13 +3430,8 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                 <input
                   type="text"
                   value={prodName}
-                  onChange={e => {
-                    setProdName(e.target.value);
-                    if (!editingProduct) {
-                      setProdSlug(e.target.value.toLowerCase().replace(/[^a-z0-9_-]+/g, '-'));
-                    }
-                  }}
-                  placeholder="e.g. Apex Horizon Titanium Smartwatch"
+                  onChange={e => handleProdNameChange(e.target.value)}
+                  placeholder="e.g. 3 PIECE PRINTED LAWN SUIT-AXIS BLOOM"
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
                   required
                 />
@@ -3369,14 +3439,31 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Slug URL</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs text-slate-400">URL Slug *</label>
+                    <button
+                      type="button"
+                      onClick={handleRegenerateProdSlug}
+                      className="text-[10px] text-slate-400 hover:text-emerald-400 underline"
+                      title="Reset slug based on current product title"
+                    >
+                      Regenerate
+                    </button>
+                  </div>
                   <input
                     type="text"
                     value={prodSlug}
-                    onChange={e => setProdSlug(e.target.value)}
-                    placeholder="e.g. apex-horizon-smartwatch"
+                    onChange={e => {
+                      setProdSlug(e.target.value);
+                      setProdIsSlugCustom(true);
+                    }}
+                    placeholder="e.g. 3-piece-printed-lawn-suit-axis-bloom"
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
+                    required
                   />
+                  <div className="mt-1 text-[10px] text-slate-500 font-mono truncate">
+                    Preview: <span className="text-emerald-400">/#product/{normalizeSlug(prodSlug) || '...'}</span>
+                  </div>
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-1">

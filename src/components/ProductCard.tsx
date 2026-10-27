@@ -22,12 +22,20 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const displayPrice = customSellingPrice !== undefined ? customSellingPrice : product.adminBasePrice;
   const imageUrl = ImageService.resolveProductImage(product.imageUrls?.[0], product.categoryId);
 
+  const productHref = `/#product/${product.slug || product.productId}`;
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    onSelect(product);
+  };
+
   return (
     <div className="group flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden hover:border-slate-300 hover:shadow-md transition-all duration-200">
       {/* Product Image Frame (Full Image Visibility, 3:4 portrait) */}
-      <div
-        onClick={() => onSelect(product)}
-        className="relative aspect-3/4 w-full bg-slate-50/90 overflow-hidden cursor-pointer flex items-center justify-center p-2"
+      <a
+        href={productHref}
+        onClick={handleCardClick}
+        className="relative aspect-3/4 w-full bg-slate-50/90 overflow-hidden cursor-pointer flex items-center justify-center p-2 block"
       >
         <img
           src={imageUrl}
@@ -48,7 +56,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <span>+{product.imageUrls.length} photos</span>
           </div>
         )}
-      </div>
+      </a>
 
       {/* Product Content Details */}
       <div className="p-4 flex flex-col flex-1 justify-between gap-3">
@@ -60,11 +68,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <span>{product.stockQuantity > 0 ? 'In Stock' : 'Out of Stock'}</span>
           </div>
 
-          <h3
-            onClick={() => onSelect(product)}
-            className="text-sm font-semibold text-slate-900 group-hover:text-slate-700 transition-colors line-clamp-1 cursor-pointer"
-          >
-            {product.name}
+          <h3 className="line-clamp-1">
+            <a
+              href={productHref}
+              onClick={handleCardClick}
+              className="text-sm font-semibold text-slate-900 group-hover:text-slate-700 transition-colors cursor-pointer block"
+            >
+              {product.name}
+            </a>
           </h3>
 
           <p className="text-xs text-slate-500 line-clamp-2 mt-1 leading-relaxed">

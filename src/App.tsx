@@ -159,10 +159,11 @@ function AppContent() {
         setViewParam(slug);
       } else if (route.startsWith('product/')) {
         const slug = route.replace('product/', '');
-        const p = products.find(prod => prod.slug === slug);
+        setCurrentView('product-detail');
+        setViewParam(slug);
+        const p = products.find(prod => prod.slug === slug || prod.productId === slug);
         if (p) {
           setSelectedProduct(p);
-          setCurrentView('product-detail');
         }
       } else if (!route || route === 'home') {
         setCurrentView('home');
@@ -177,7 +178,19 @@ function AppContent() {
       window.removeEventListener('hashchange', parseUrl);
       window.removeEventListener('popstate', parseUrl);
     };
-  }, [setActiveAttribution]);
+  }, [setActiveAttribution, products]);
+
+  // Synchronize product detail view when products load or viewParam changes
+  useEffect(() => {
+    if (currentView === 'product-detail' && viewParam && products.length > 0) {
+      if (!selectedProduct || (selectedProduct.slug !== viewParam && selectedProduct.productId !== viewParam)) {
+        const match = products.find(p => p.slug === viewParam || p.productId === viewParam);
+        if (match) {
+          setSelectedProduct(match);
+        }
+      }
+    }
+  }, [currentView, viewParam, products, selectedProduct]);
 
   const handleNavigate = (view: string, param?: string) => {
     let targetView = view;
@@ -192,6 +205,7 @@ function AppContent() {
     // Update hash for deep-linking
     if (targetView === 'home') window.location.hash = '';
     else if (targetView === 'shop') window.location.hash = param ? `shop?category=${param}` : 'shop';
+    else if (targetView === 'product-detail' && param) window.location.hash = `product/${param}`;
     else if (targetView === 'affiliate-storefront' && param) window.location.hash = `store/${param}`;
     else if (targetView === 'track-order') window.location.hash = 'track-order';
     else if (targetView === 'affiliate-status') window.location.hash = param ? `affiliate/status/${param}` : 'affiliate/status';
@@ -204,9 +218,12 @@ function AppContent() {
   };
 
   const handleSelectProduct = (product: Product, customPrice?: number) => {
+    const slug = product.slug || product.productId;
     setSelectedProduct(product);
     setCustomPriceForSelected(customPrice);
     setCurrentView('product-detail');
+    setViewParam(slug);
+    window.location.hash = `product/${slug}`;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -247,15 +264,29 @@ function AppContent() {
           />
         )}
 
-        {currentView === 'product-detail' && selectedProduct && (
-          <ProductDetailPage
-            product={selectedProduct}
-            allProducts={products}
-            customSellingPrice={customPriceForSelected}
-            onBack={() => handleNavigate('shop')}
-            onSelectProduct={handleSelectProduct}
-            onNavigate={handleNavigate}
-          />
+        {currentView === 'product-detail' && (
+          selectedProduct ? (
+            <ProductDetailPage
+              product={selectedProduct}
+              allProducts={products}
+              customSellingPrice={customPriceForSelected}
+              onBack={() => handleNavigate('shop')}
+              onSelectProduct={handleSelectProduct}
+              onNavigate={handleNavigate}
+            />
+          ) : (
+            <div className="max-w-4xl mx-auto px-4 py-24 text-center">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900 mb-4"></div>
+              <p className="text-sm font-medium text-slate-700">Loading product details...</p>
+              <button
+                type="button"
+                onClick={() => handleNavigate('shop')}
+                className="mt-4 px-4 py-2 text-xs font-semibold bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                Return to Shop
+              </button>
+            </div>
+          )
         )}
 
         {currentView === 'checkout' && (
