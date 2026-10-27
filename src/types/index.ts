@@ -72,6 +72,8 @@ export interface Product {
   stockQuantity: number;
   isActive: boolean;
   featured?: boolean;
+  featuredInHeroSlider?: boolean;
+  heroOfferTitle?: string;
   createdAt: string;
   updatedAt: string;
 }

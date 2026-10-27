@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowRight, ShieldCheck, Zap, Award, Sparkles, Truck, CreditCard, TrendingUp, CheckCircle2 } from 'lucide-react';
 import { Product, HomepageCMSConfig } from '../types';
 import { ProductCard } from '../components/ProductCard';
+import { HeroProductSlider } from '../components/HeroProductSlider';
 import { CMSService, DEFAULT_HOMEPAGE_CMS } from '../services/cmsService';
 import { applySEO } from '../utils/seoUtils';
 
@@ -133,16 +134,12 @@ export const HomePage: React.FC<HomePageProps> = ({ products, onSelectProduct, o
               </div>
             </div>
 
-            {/* Hero Right Visual Banner */}
-            <div className="relative min-h-[300px] lg:min-h-full bg-slate-900 overflow-hidden">
-              <img
-                src={cms.hero.bgImageUrl || '/src/assets/images/ronvex_hero_lifestyle_1792836927304.jpg'}
-                alt={cms.hero.title}
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover object-center brightness-95"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent lg:hidden" />
-            </div>
+            {/* Hero Right Featured Products Auto Slider */}
+            <HeroProductSlider
+              products={products}
+              onSelectProduct={onSelectProduct}
+              onNavigate={onNavigate}
+            />
           </div>
         </section>
       )}

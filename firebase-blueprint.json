@@ -68,6 +68,8 @@
         "maxAffiliateIncrease": { "type": "number" },
         "stockQuantity": { "type": "number" },
         "isActive": { "type": "boolean" },
+        "featuredInHeroSlider": { "type": "boolean" },
+        "heroOfferTitle": { "type": "string", "maxLength": 150 },
         "createdAt": { "type": "string" },
         "updatedAt": { "type": "string" }
       },
