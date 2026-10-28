@@ -217,15 +217,6 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
   return (
     <div className="bg-white min-h-screen text-slate-900 pb-20">
-      {/* Top Banner Notice (Matches Pakistani Lawn / SJ Closet style) */}
-      <div className="bg-black text-white text-[11px] sm:text-xs font-semibold tracking-widest py-2 px-4 uppercase text-center flex items-center justify-center gap-4 overflow-x-auto whitespace-nowrap">
-        <span>NEW ARRIVALS — SHOP THE LATEST</span>
-        <span className="hidden sm:inline">·</span>
-        <span className="hidden sm:inline">CASH ON DELIVERY AVAILABLE</span>
-        <span className="hidden md:inline">·</span>
-        <span className="hidden md:inline">NATIONWIDE EXPRESS DISPATCH</span>
-      </div>
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
         {/* Breadcrumb Navigation matching screenshot */}
         <div className="flex items-center justify-between gap-2 text-xs text-slate-500 mb-6 flex-wrap">
