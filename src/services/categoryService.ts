@@ -59,6 +59,16 @@ export const DEFAULT_CATEGORIES: ProductCategory[] = [
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
+  {
+    categoryId: 'women-clothing',
+    name: "Women's Clothing",
+    slug: 'womens-clothing',
+    description: 'Designer lawn, luxury embroidered Pakistani suits, unstitched collections, and festive apparel.',
+    iconName: 'ShoppingBag',
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
 ];
 
 const CATEGORIES_STORAGE_KEY = 'ronvex_persisted_categories';

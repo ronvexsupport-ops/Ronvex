@@ -67,7 +67,16 @@ export interface Product {
   categoryId: string;
   categoryName: string;
   imageUrls: string[];
-  adminBasePrice: number; // e.g., 600 BDT
+  adminBasePrice: number; // e.g., 4300 BDT
+  originalPrice?: number; // e.g., 5100 BDT (for strikethrough price)
+  discountPercent?: number; // e.g., 16 (for -16% badge)
+  brand?: string; // e.g., "JAZMIN"
+  sku?: string; // e.g., "SJ0025"
+  stitchingType?: string; // e.g., "Unstitched" or "Stitched"
+  stockUrgencyText?: string; // e.g., "Only 1 left in stock"
+  disclaimer?: string; // Fabric / lighting disclaimer
+  returnPolicy?: string; // Return & Exchange policy
+  shippingPolicy?: string; // Nationwide delivery terms
   maxAffiliateIncrease: number; // e.g., 150 BDT
   stockQuantity: number;
   isActive: boolean;

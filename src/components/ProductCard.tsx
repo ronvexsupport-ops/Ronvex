@@ -22,6 +22,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const displayPrice = customSellingPrice !== undefined ? customSellingPrice : product.adminBasePrice;
   const imageUrl = ImageService.resolveProductImage(product.imageUrls?.[0], product.categoryId);
 
+  const originalPrice = product.originalPrice && product.originalPrice > displayPrice ? product.originalPrice : undefined;
+  const discountPercent = product.discountPercent || (originalPrice ? Math.round(((originalPrice - displayPrice) / originalPrice) * 100) : undefined);
+
   const productHref = `/#product/${product.slug || product.productId}`;
 
   const handleCardClick = (e: React.MouseEvent) => {
@@ -46,8 +49,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             (e.target as HTMLImageElement).src = ImageService.getCategoryFallback(product.categoryId);
           }}
         />
-        {product.stockQuantity <= 5 && product.stockQuantity > 0 && (
-          <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm text-[11px] font-medium text-amber-700 px-2 py-0.5 rounded shadow-sm">
+        {discountPercent && discountPercent > 0 && (
+          <div className="absolute top-2.5 left-2.5 bg-black text-white text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10">
+            -{discountPercent}%
+          </div>
+        )}
+        {!discountPercent && product.stockQuantity <= 5 && product.stockQuantity > 0 && (
+          <div className="absolute top-2.5 left-2.5 bg-white/95 backdrop-blur-sm text-[10px] font-medium text-amber-700 px-2 py-0.5 rounded shadow-sm">
             Only {product.stockQuantity} remaining
           </div>
         )}
@@ -61,9 +69,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       {/* Product Content Details */}
       <div className="p-2.5 sm:p-4 flex flex-col flex-1 justify-between gap-2 sm:gap-3">
         <div>
-          {/* Clean Unboxed Metadata with · separator */}
+          {/* Brand or Category */}
           <div className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs text-slate-500 mb-1 truncate">
-            <span className="truncate">{product.categoryName}</span>
+            <span className="font-semibold uppercase tracking-wider text-slate-700 truncate">{product.brand || product.categoryName}</span>
             <span aria-hidden="true">·</span>
             <span className="shrink-0">{product.stockQuantity > 0 ? 'In Stock' : 'Out'}</span>
           </div>
@@ -86,8 +94,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         {/* Pricing & Add to Cart Footer */}
         <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
           <div>
-            <div className="text-sm sm:text-base font-bold text-slate-950 font-mono tabular-nums">
-              {PricingEngine.formatBDT(displayPrice)}
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-sm sm:text-base font-bold text-slate-950 font-mono tabular-nums">
+                {PricingEngine.formatBDT(displayPrice)}
+              </span>
+              {originalPrice && (
+                <span className="text-xs text-slate-400 line-through font-mono">
+                  {PricingEngine.formatBDT(originalPrice)}
+                </span>
+              )}
             </div>
             {isAffiliateView && customSellingPrice !== undefined && (
               <div className="text-[9px] sm:text-[10px] text-emerald-700 font-medium">

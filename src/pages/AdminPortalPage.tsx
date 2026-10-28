@@ -218,6 +218,15 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
   const [prodStock, setProdStock] = useState<number>(50);
   const [prodImageUrl, setProdImageUrl] = useState('');
   const [prodAdditionalImages, setProdAdditionalImages] = useState<string[]>([]);
+  // Luxury Designer / SJ Closet Product fields
+  const [prodBrand, setProdBrand] = useState('JAZMIN');
+  const [prodSku, setProdSku] = useState('SJ0025');
+  const [prodOriginalPrice, setProdOriginalPrice] = useState<number>(0);
+  const [prodStitchingType, setProdStitchingType] = useState('Unstitched');
+  const [prodStockUrgencyText, setProdStockUrgencyText] = useState('Only 1 left in stock');
+  const [prodDisclaimer, setProdDisclaimer] = useState('Product color may slightly vary due to photographic lighting sources or your device monitor settings. Dry clean recommended. Do not bleach.');
+  const [prodReturnPolicy, setProdReturnPolicy] = useState('Any product purchased online can be exchanged within 7 days from the delivery date, provided it is unused, unwashed, with all original tags attached and intact original packaging.');
+  const [prodShippingPolicy, setProdShippingPolicy] = useState('Nationwide delivery across all 64 districts in Bangladesh. Inside Dhaka: 24–48 hours (৳80). Outside Dhaka: 48–72 hours (৳150). Cash on delivery with doorstep parcel verification before payment.');
 
   // Category Add / Edit Modal State
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -574,14 +583,26 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     setProdInHeroSlider(false);
     setProdHeroOfferTitle('');
     setProdDesc('');
-    const defaultCat = categories[0] || { categoryId: 'wearables', name: 'Smart Wearables' };
+    const defaultCat = categories.find(c => c.categoryId === 'women-clothing') || categories[0] || { categoryId: 'women-clothing', name: "Women's Clothing" };
     setProdCategory(defaultCat.categoryId);
     setProdCategoryName(defaultCat.name);
-    setProdBasePrice(600);
-    setProdMaxIncrease(150);
-    setProdStock(50);
-    setProdImageUrl(BUNDLED_IMAGES.smartwatch);
-    setProdAdditionalImages([]);
+    setProdBasePrice(4300);
+    setProdOriginalPrice(5100);
+    setProdBrand('JAZMIN');
+    setProdSku(`SJ00${Math.floor(10 + Math.random() * 89)}`);
+    setProdStitchingType('Unstitched');
+    setProdStockUrgencyText('Only 1 left in stock');
+    setProdDisclaimer('Product color may slightly vary due to photographic lighting sources or your device monitor settings. Dry clean recommended. Do not bleach.');
+    setProdReturnPolicy('Any product purchased online can be exchanged within 7 days from the delivery date, provided it is unused, unwashed, with all original tags attached and intact original packaging.');
+    setProdShippingPolicy('Nationwide delivery across all 64 districts in Bangladesh. Inside Dhaka: 24–48 hours (৳80). Outside Dhaka: 48–72 hours (৳150). Cash on delivery with doorstep parcel verification before payment.');
+    setProdMaxIncrease(350);
+    setProdStock(1);
+    setProdImageUrl('/assets/aistudio/image_3a2df0f6.png');
+    setProdAdditionalImages([
+      '/assets/aistudio/6269227234010796902_cec44bc3.jpg',
+      '/assets/aistudio/6269227234010796900_4ca35bdf.jpg',
+      '/assets/aistudio/6269227234010796901_cbcf43fd.jpg',
+    ]);
     setShowProductModal(true);
   };
 
@@ -592,11 +613,19 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     setProdIsSlugCustom(true);
     setProdInHeroSlider(!!p.featuredInHeroSlider);
     setProdHeroOfferTitle(p.heroOfferTitle || '');
-    setProdDesc(p.description);
+    setProdDesc(p.description || '');
     setProdCategory(p.categoryId);
     setProdCategoryName(p.categoryName);
     setProdBasePrice(p.adminBasePrice);
-    setProdMaxIncrease(p.maxAffiliateIncrease);
+    setProdOriginalPrice(p.originalPrice || 0);
+    setProdBrand(p.brand || 'JAZMIN');
+    setProdSku(p.sku || p.productId);
+    setProdStitchingType(p.stitchingType || 'Unstitched');
+    setProdStockUrgencyText(p.stockUrgencyText || (p.stockQuantity <= 3 ? `Only ${p.stockQuantity} left in stock` : ''));
+    setProdDisclaimer(p.disclaimer || 'Product color may slightly vary due to photographic lighting sources or your device monitor settings. Dry clean recommended. Do not bleach.');
+    setProdReturnPolicy(p.returnPolicy || 'Any product purchased online can be exchanged within 7 days from the delivery date, provided it is unused, unwashed, with all original tags attached and intact original packaging.');
+    setProdShippingPolicy(p.shippingPolicy || 'Nationwide delivery across all 64 districts in Bangladesh. Inside Dhaka: 24–48 hours (৳80). Outside Dhaka: 48–72 hours (৳150). Cash on delivery with doorstep parcel verification before payment.');
+    setProdMaxIncrease(p.maxAffiliateIncrease || 150);
     setProdStock(p.stockQuantity);
     const [firstImg, ...restImgs] = p.imageUrls || [];
     setProdImageUrl(firstImg || DEFAULT_FALLBACK_IMAGE);
@@ -733,14 +762,29 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
 
     const combinedImages = Array.from(new Set([finalImageUrl, ...resolvedAdditional]));
 
+    const origPriceNum = Number(prodOriginalPrice);
+    const basePriceNum = Number(prodBasePrice);
+    const discountPct = (origPriceNum > basePriceNum && origPriceNum > 0)
+      ? Math.round(((origPriceNum - basePriceNum) / origPriceNum) * 100)
+      : undefined;
+
     const productPayload: Product = {
       productId,
       name: prodName.trim(),
       slug: cleanSlug,
+      brand: prodBrand.trim() || 'JAZMIN',
+      sku: prodSku.trim() || productId,
       description: prodDesc.trim(),
       categoryId: prodCategory,
       categoryName,
-      adminBasePrice: Number(prodBasePrice),
+      adminBasePrice: basePriceNum,
+      originalPrice: origPriceNum > 0 ? origPriceNum : undefined,
+      discountPercent: discountPct,
+      stitchingType: prodStitchingType.trim() || 'Unstitched',
+      stockUrgencyText: prodStockUrgencyText.trim() || undefined,
+      disclaimer: prodDisclaimer.trim(),
+      returnPolicy: prodReturnPolicy.trim(),
+      shippingPolicy: prodShippingPolicy.trim(),
       maxAffiliateIncrease: Number(prodMaxIncrease),
       stockQuantity: Number(prodStock),
       imageUrls: combinedImages,
@@ -2684,8 +2728,20 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                             }}
                           />
                           <div>
-                            <div className="font-semibold text-white">{p.name}</div>
-                            <div className="flex items-center gap-1.5 mt-0.5">
+                            <div className="flex items-center gap-2">
+                              {p.brand && (
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-900/50">
+                                  {p.brand}
+                                </span>
+                              )}
+                              <span className="font-semibold text-white">{p.name}</span>
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              {p.sku && (
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  SKU: {p.sku}
+                                </span>
+                              )}
                               <span className="text-[10px] text-slate-500 font-mono">/#product/{p.slug || p.productId}</span>
                               <button
                                 type="button"
@@ -2707,7 +2763,14 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                             {p.categoryName}
                           </span>
                         </td>
-                        <td className="p-3 font-mono font-bold text-white">৳{p.adminBasePrice}</td>
+                        <td className="p-3 font-mono">
+                          <div className="font-bold text-white">৳{p.adminBasePrice.toLocaleString()}</div>
+                          {p.originalPrice && p.originalPrice > p.adminBasePrice && (
+                            <div className="text-[10px] text-slate-500 line-through">
+                              ৳{p.originalPrice.toLocaleString()} (-{Math.round(((p.originalPrice - p.adminBasePrice) / p.originalPrice) * 100)}%)
+                            </div>
+                          )}
+                        </td>
                         <td className="p-3 font-mono text-emerald-400">+৳{p.maxAffiliateIncrease}</td>
                         <td className="p-3 font-mono text-slate-300">৳{p.adminBasePrice + p.maxAffiliateIncrease}</td>
                         <td className="p-3 font-mono">{p.stockQuantity}</td>
@@ -3725,6 +3788,31 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
+                  <label className="block text-xs text-slate-400 mb-1">Brand Name *</label>
+                  <input
+                    type="text"
+                    value={prodBrand}
+                    onChange={e => setProdBrand(e.target.value)}
+                    placeholder="e.g. JAZMIN or SJ CLOSET"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white uppercase font-semibold"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">SKU Code *</label>
+                  <input
+                    type="text"
+                    value={prodSku}
+                    onChange={e => setProdSku(e.target.value)}
+                    placeholder="e.g. SJ0025"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono uppercase"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-xs text-slate-400">URL Slug *</label>
                     <button
@@ -3780,25 +3868,32 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Admin Base (৳) *</label>
+                  <label className="block text-xs text-slate-400 mb-1">Selling Price (৳) *</label>
                   <input
                     type="number"
                     value={prodBasePrice}
                     onChange={e => setProdBasePrice(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono font-bold"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Max Bonus Cap (৳) *</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs text-slate-400">Original (৳)</label>
+                    {Number(prodOriginalPrice) > Number(prodBasePrice) && (
+                      <span className="text-[10px] font-bold text-amber-400 bg-amber-950 px-1.5 py-0.2 rounded">
+                        -{Math.round(((Number(prodOriginalPrice) - Number(prodBasePrice)) / Number(prodOriginalPrice)) * 100)}%
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="number"
-                    value={prodMaxIncrease}
-                    onChange={e => setProdMaxIncrease(Number(e.target.value))}
+                    value={prodOriginalPrice}
+                    onChange={e => setProdOriginalPrice(Number(e.target.value))}
+                    placeholder="Strikethrough price"
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
-                    required
                   />
                 </div>
                 <div>
@@ -3809,6 +3904,39 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                     onChange={e => setProdStock(Number(e.target.value))}
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
                     required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Max Bonus (৳) *</label>
+                  <input
+                    type="number"
+                    value={prodMaxIncrease}
+                    onChange={e => setProdMaxIncrease(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Stitching / Variant Tag</label>
+                  <input
+                    type="text"
+                    value={prodStitchingType}
+                    onChange={e => setProdStitchingType(e.target.value)}
+                    placeholder="e.g. Unstitched, Stitched, Ready to Wear"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Stock Urgency Label</label>
+                  <input
+                    type="text"
+                    value={prodStockUrgencyText}
+                    onChange={e => setProdStockUrgencyText(e.target.value)}
+                    placeholder="e.g. Only 1 left in stock"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-amber-300"
                   />
                 </div>
               </div>
@@ -4001,15 +4129,70 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Description</label>
-                <textarea
-                  rows={3}
-                  value={prodDesc}
-                  onChange={e => setProdDesc(e.target.value)}
-                  placeholder="Detail build materials, warranty, battery, and key technical specifications..."
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
-                />
+              {/* Product Accordions / Detailed Policies Section */}
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Product Page Accordions & Policies</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400">Rendered as collapsible tabs on product page</span>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-slate-300 font-medium mb-1">
+                      1. Description & Specifications *
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={prodDesc}
+                      onChange={e => setProdDesc(e.target.value)}
+                      placeholder="Detail fabric compositions, embroidery techniques, inclusions (dupatta, trousers, shirt), and sizing..."
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-slate-300 font-medium mb-1">
+                      2. Fabric & Lighting Disclaimer
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={prodDisclaimer}
+                      onChange={e => setProdDisclaimer(e.target.value)}
+                      placeholder="Product color may slightly vary due to photographic lighting sources or your device monitor settings..."
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-slate-300 font-medium mb-1">
+                      3. Return & Exchange Policy
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={prodReturnPolicy}
+                      onChange={e => setProdReturnPolicy(e.target.value)}
+                      placeholder="Any product purchased online can be exchanged within 7 days from the delivery date, provided it is unused..."
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-slate-300 font-medium mb-1">
+                      4. Shipping & Delivery Policy
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={prodShippingPolicy}
+                      onChange={e => setProdShippingPolicy(e.target.value)}
+                      placeholder="Nationwide delivery across all 64 districts in Bangladesh. Inside Dhaka: 24–48 hours (৳80). Outside Dhaka: 48–72 hours (৳150)..."
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
