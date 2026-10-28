@@ -123,6 +123,21 @@ import { useAuth } from '../context/AuthContext';
 import { AdminLoginPage } from './AdminLoginPage';
 import { LogoFaviconSettings } from '../components/admin/LogoFaviconSettings';
 
+// Recursively sanitize objects so no undefined fields ever reach Firestore setDoc/updateDoc
+export function sanitizeProductForFirestore(obj: Record<string, any>): Record<string, any> {
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        result[key] = sanitizeProductForFirestore(value);
+      } else {
+        result[key] = value;
+      }
+    }
+  }
+  return result;
+}
+
 interface AdminPortalPageProps {
   products: Product[];
   onRefreshProducts: () => void;
@@ -227,6 +242,15 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
   const [prodDisclaimer, setProdDisclaimer] = useState('Product color may slightly vary due to photographic lighting sources or your device monitor settings. Dry clean recommended. Do not bleach.');
   const [prodReturnPolicy, setProdReturnPolicy] = useState('Any product purchased online can be exchanged within 7 days from the delivery date, provided it is unused, unwashed, with all original tags attached and intact original packaging.');
   const [prodShippingPolicy, setProdShippingPolicy] = useState('Nationwide delivery across all 64 districts in Bangladesh. Inside Dhaka: 24–48 hours (৳80). Outside Dhaka: 48–72 hours (৳150). Cash on delivery with doorstep parcel verification before payment.');
+
+  // Inline Quick Edit state for table rows
+  const [quickEditId, setQuickEditId] = useState<string | null>(null);
+  const [quickName, setQuickName] = useState('');
+  const [quickCategory, setQuickCategory] = useState('');
+  const [quickBasePrice, setQuickBasePrice] = useState<number>(0);
+  const [quickOriginalPrice, setQuickOriginalPrice] = useState<number>(0);
+  const [quickStock, setQuickStock] = useState<number>(0);
+  const [savingQuickEdit, setSavingQuickEdit] = useState(false);
 
   // Category Add / Edit Modal State
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -768,7 +792,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
       ? Math.round(((origPriceNum - basePriceNum) / origPriceNum) * 100)
       : undefined;
 
-    const productPayload: Product = {
+    const rawPayload: Record<string, any> = {
       productId,
       name: prodName.trim(),
       slug: cleanSlug,
@@ -778,15 +802,12 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
       categoryId: prodCategory,
       categoryName,
       adminBasePrice: basePriceNum,
-      originalPrice: origPriceNum > 0 ? origPriceNum : undefined,
-      discountPercent: discountPct,
       stitchingType: prodStitchingType.trim() || 'Unstitched',
-      stockUrgencyText: prodStockUrgencyText.trim() || undefined,
       disclaimer: prodDisclaimer.trim(),
       returnPolicy: prodReturnPolicy.trim(),
       shippingPolicy: prodShippingPolicy.trim(),
-      maxAffiliateIncrease: Number(prodMaxIncrease),
-      stockQuantity: Number(prodStock),
+      maxAffiliateIncrease: Number(prodMaxIncrease) || 0,
+      stockQuantity: Number(prodStock) || 0,
       imageUrls: combinedImages,
       isActive: editingProduct ? editingProduct.isActive : true,
       featuredInHeroSlider: prodInHeroSlider,
@@ -795,32 +816,116 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
       updatedAt: new Date().toISOString(),
     };
 
+    if (origPriceNum > 0) {
+      rawPayload.originalPrice = origPriceNum;
+    }
+    if (discountPct !== undefined && discountPct > 0) {
+      rawPayload.discountPercent = discountPct;
+    }
+    if (prodStockUrgencyText.trim()) {
+      rawPayload.stockUrgencyText = prodStockUrgencyText.trim();
+    }
+
+    // Completely sanitize payload to eliminate any undefined values for Firestore
+    const cleanedPayload = sanitizeProductForFirestore(rawPayload) as Product;
+
     // Persist to Firestore first as source of truth
     try {
-      await setDoc(doc(db, 'products', productId), productPayload);
+      await setDoc(doc(db, 'products', productId), cleanedPayload);
       await CMSService.logActivity(adminUid, adminEmail, 'SAVE_PRODUCT', 'Products', `Saved product: ${prodName}`).catch(() => {});
 
       // Persist to local storage cache
-      saveSingleProductLocally(productPayload);
+      saveSingleProductLocally(cleanedPayload);
 
       // Update in-memory state
       setProductList(prev => {
         const idx = prev.findIndex(p => p.productId === productId);
         if (idx >= 0) {
           const updated = [...prev];
-          updated[idx] = productPayload;
+          updated[idx] = cleanedPayload;
           return updated;
         }
-        return [productPayload, ...prev];
+        return [cleanedPayload, ...prev];
       });
 
       setShowProductModal(false);
-      setActionSuccess(`Product "${prodName}" saved successfully.`);
+      setActionSuccess(`Product "${prodName}" saved successfully and is now live on the storefront!`);
       onRefreshProducts();
       fetchAllData();
     } catch (err: any) {
       console.error('Failed to save product to database:', err);
       setActionError(err.message || 'Failed to save product to database.');
+    }
+  };
+
+  // ---------------- INLINE QUICK EDIT HANDLERS ----------------
+  const startQuickEdit = (p: Product) => {
+    setQuickEditId(p.productId);
+    setQuickName(p.name);
+    setQuickCategory(p.categoryId);
+    setQuickBasePrice(p.adminBasePrice);
+    setQuickOriginalPrice(p.originalPrice || 0);
+    setQuickStock(p.stockQuantity);
+  };
+
+  const cancelQuickEdit = () => {
+    setQuickEditId(null);
+  };
+
+  const saveQuickEdit = async (productId: string) => {
+    if (!quickName.trim()) {
+      setActionError('Product name cannot be empty.');
+      return;
+    }
+    setSavingQuickEdit(true);
+    setActionError(null);
+    try {
+      const existing = productList.find(p => p.productId === productId);
+      if (!existing) return;
+
+      const selCat = categories.find(c => c.categoryId === quickCategory);
+      const catName = selCat ? selCat.name : existing.categoryName;
+      const origNum = Number(quickOriginalPrice);
+      const baseNum = Number(quickBasePrice);
+      const discountPct = (origNum > baseNum && origNum > 0)
+        ? Math.round(((origNum - baseNum) / origNum) * 100)
+        : undefined;
+
+      const updatedData: Record<string, any> = {
+        ...existing,
+        name: quickName.trim(),
+        categoryId: quickCategory,
+        categoryName: catName,
+        adminBasePrice: baseNum,
+        stockQuantity: Number(quickStock),
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (origNum > 0) {
+        updatedData.originalPrice = origNum;
+      } else {
+        delete updatedData.originalPrice;
+      }
+
+      if (discountPct !== undefined && discountPct > 0) {
+        updatedData.discountPercent = discountPct;
+      } else {
+        delete updatedData.discountPercent;
+      }
+
+      const sanitized = sanitizeProductForFirestore(updatedData) as Product;
+
+      await setDoc(doc(db, 'products', productId), sanitized, { merge: true });
+      saveSingleProductLocally(sanitized);
+      setProductList(prev => prev.map(p => p.productId === productId ? sanitized : p));
+      setQuickEditId(null);
+      setActionSuccess(`Product "${quickName}" updated live on the site!`);
+      onRefreshProducts();
+    } catch (err: any) {
+      console.error('Error saving quick edit:', err);
+      setActionError(err.message || 'Failed to save product changes.');
+    } finally {
+      setSavingQuickEdit(false);
     }
   };
 
@@ -2716,140 +2821,261 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60">
-                    {filteredProducts.map(p => (
-                      <tr key={p.productId} className="hover:bg-slate-900/50">
-                        <td className="p-3 flex items-center gap-3">
-                          <img
-                            src={ImageService.resolveProductImage(p.imageUrls?.[0], p.categoryId)}
-                            alt={p.name}
-                            className="w-12 h-12 object-cover rounded-xl bg-slate-900 border border-slate-800 shrink-0"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = ImageService.getCategoryFallback(p.categoryId);
-                            }}
-                          />
-                          <div>
-                            <div className="flex items-center gap-2">
-                              {p.brand && (
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-900/50">
-                                  {p.brand}
-                                </span>
-                              )}
-                              <span className="font-semibold text-white">{p.name}</span>
-                            </div>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              {p.sku && (
-                                <span className="text-[10px] text-slate-400 font-mono">
-                                  SKU: {p.sku}
-                                </span>
-                              )}
-                              <span className="text-[10px] text-slate-500 font-mono">/#product/{p.slug || p.productId}</span>
+                    {filteredProducts.map(p => {
+                      const isQuickEditing = quickEditId === p.productId;
+
+                      if (isQuickEditing) {
+                        return (
+                          <tr key={p.productId} className="bg-slate-900/90 border-2 border-emerald-500/70">
+                            <td className="p-3" colSpan={2}>
+                              <div className="space-y-2">
+                                <div>
+                                  <label className="block text-[10px] text-slate-400 font-medium mb-1">Product Title</label>
+                                  <input
+                                    type="text"
+                                    value={quickName}
+                                    onChange={e => setQuickName(e.target.value)}
+                                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500"
+                                    placeholder="Product title"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] text-slate-400 font-medium mb-1">Category</label>
+                                  <select
+                                    value={quickCategory}
+                                    onChange={e => setQuickCategory(e.target.value)}
+                                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white"
+                                  >
+                                    {categories.map(c => (
+                                      <option key={c.categoryId} value={c.categoryId}>{c.name}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="p-3">
+                              <label className="block text-[10px] text-slate-400 font-medium mb-1">Selling Price (৳)</label>
+                              <input
+                                type="number"
+                                value={quickBasePrice}
+                                onChange={e => setQuickBasePrice(Number(e.target.value))}
+                                className="w-24 px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white font-mono"
+                              />
+                              <label className="block text-[10px] text-slate-400 font-medium mt-1.5 mb-1">Original Price (৳)</label>
+                              <input
+                                type="number"
+                                value={quickOriginalPrice}
+                                onChange={e => setQuickOriginalPrice(Number(e.target.value))}
+                                placeholder="0"
+                                className="w-24 px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white font-mono"
+                              />
+                            </td>
+                            <td className="p-3 font-mono text-emerald-400 text-xs">
+                              +৳{p.maxAffiliateIncrease}
+                            </td>
+                            <td className="p-3 font-mono text-slate-300 text-xs">
+                              ৳{quickBasePrice + p.maxAffiliateIncrease}
+                            </td>
+                            <td className="p-3">
+                              <label className="block text-[10px] text-slate-400 font-medium mb-1">Stock</label>
+                              <input
+                                type="number"
+                                value={quickStock}
+                                onChange={e => setQuickStock(Number(e.target.value))}
+                                className="w-16 px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white font-mono"
+                              />
+                            </td>
+                            <td className="p-3 text-center">
+                              <span className="text-[10px] text-slate-500">Quick Edit</span>
+                            </td>
+                            <td className="p-3">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                p.isActive ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-rose-950 text-rose-300 border border-rose-800'
+                              }`}>
+                                {p.isActive ? 'ACTIVE' : 'INACTIVE'}
+                              </span>
+                            </td>
+                            <td className="p-3 text-right space-x-2 whitespace-nowrap">
                               <button
                                 type="button"
-                                onClick={() => handleCopyProductPublicLink(p)}
-                                className="p-1 hover:text-white text-slate-400 transition-colors"
-                                title="Copy public link"
+                                onClick={() => saveQuickEdit(p.productId)}
+                                disabled={savingQuickEdit}
+                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1 shadow-md transition-all cursor-pointer disabled:opacity-50"
                               >
-                                {prodCopiedSlug === p.productId ? (
-                                  <Check className="w-3 h-3 text-emerald-400" />
-                                ) : (
-                                  <Copy className="w-3 h-3" />
-                                )}
+                                {savingQuickEdit ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                                <span>Save Live</span>
                               </button>
+                              <button
+                                type="button"
+                                onClick={cancelQuickEdit}
+                                className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-all cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      return (
+                        <tr key={p.productId} className="hover:bg-slate-900/50 transition-colors">
+                          <td className="p-3 flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => openEditProductModal(p)}
+                              className="w-12 h-14 object-cover rounded-xl bg-slate-900 border border-slate-800 shrink-0 overflow-hidden cursor-pointer hover:ring-2 hover:ring-emerald-500 transition-all p-0.5"
+                              title="Click to edit product"
+                            >
+                              <img
+                                src={ImageService.resolveProductImage(p.imageUrls?.[0], p.categoryId)}
+                                alt={p.name}
+                                className="w-full h-full object-contain"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = ImageService.getCategoryFallback(p.categoryId);
+                                }}
+                              />
+                            </button>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                {p.brand && (
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-900/50">
+                                    {p.brand}
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => openEditProductModal(p)}
+                                  className="font-semibold text-white hover:text-emerald-400 transition-colors text-left cursor-pointer"
+                                  title="Click to edit product title and information"
+                                >
+                                  {p.name}
+                                </button>
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                {p.sku && (
+                                  <span className="text-[10px] text-slate-400 font-mono">
+                                    SKU: {p.sku}
+                                  </span>
+                                )}
+                                <span className="text-[10px] text-slate-500 font-mono">/#product/{p.slug || p.productId}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyProductPublicLink(p)}
+                                  className="p-1 hover:text-white text-slate-400 transition-colors"
+                                  title="Copy public link"
+                                >
+                                  {prodCopiedSlug === p.productId ? (
+                                    <Check className="w-3 h-3 text-emerald-400" />
+                                  ) : (
+                                    <Copy className="w-3 h-3" />
+                                  )}
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        <td className="p-3">
-                          <span className="px-2 py-0.5 bg-slate-900 border border-slate-800 rounded text-slate-300">
-                            {p.categoryName}
-                          </span>
-                        </td>
-                        <td className="p-3 font-mono">
-                          <div className="font-bold text-white">৳{p.adminBasePrice.toLocaleString()}</div>
-                          {p.originalPrice && p.originalPrice > p.adminBasePrice && (
-                            <div className="text-[10px] text-slate-500 line-through">
-                              ৳{p.originalPrice.toLocaleString()} (-{Math.round(((p.originalPrice - p.adminBasePrice) / p.originalPrice) * 100)}%)
-                            </div>
-                          )}
-                        </td>
-                        <td className="p-3 font-mono text-emerald-400">+৳{p.maxAffiliateIncrease}</td>
-                        <td className="p-3 font-mono text-slate-300">৳{p.adminBasePrice + p.maxAffiliateIncrease}</td>
-                        <td className="p-3 font-mono">{p.stockQuantity}</td>
-                        <td className="p-3 text-center">
-                          <button
-                            type="button"
-                            onClick={() => handleToggleHeroSlider(p)}
-                            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
-                              p.featuredInHeroSlider
-                                ? 'bg-emerald-950 text-emerald-300 border-emerald-800 hover:bg-emerald-900'
-                                : 'bg-slate-900 text-slate-500 border-slate-800 hover:text-slate-300 hover:border-slate-700'
-                            }`}
-                            title={p.featuredInHeroSlider ? 'Checkmarked for Homepage Hero Slider' : 'Click to feature in Homepage Hero Slider'}
-                          >
-                            {p.featuredInHeroSlider ? (
-                              <>
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                                <span>Checked</span>
-                              </>
-                            ) : (
-                              <>
-                                <span className="w-3 h-3 rounded border border-slate-600 inline-block" />
-                                <span>Add</span>
-                              </>
+                          </td>
+                          <td className="p-3">
+                            <span className="px-2 py-0.5 bg-slate-900 border border-slate-800 rounded text-slate-300">
+                              {p.categoryName}
+                            </span>
+                          </td>
+                          <td className="p-3 font-mono">
+                            <div className="font-bold text-white">৳{p.adminBasePrice.toLocaleString()}</div>
+                            {p.originalPrice && p.originalPrice > p.adminBasePrice && (
+                              <div className="text-[10px] text-slate-500 line-through">
+                                ৳{p.originalPrice.toLocaleString()} (-{Math.round(((p.originalPrice - p.adminBasePrice) / p.originalPrice) * 100)}%)
+                              </div>
                             )}
-                          </button>
-                        </td>
-                        <td className="p-3">
-                          <button
-                            type="button"
-                            onClick={() => handleToggleProductActive(p)}
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              p.isActive ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-rose-950 text-rose-300 border border-rose-800'
-                            }`}
-                          >
-                            {p.isActive ? 'ACTIVE' : 'INACTIVE'}
-                          </button>
-                        </td>
-                        <td className="p-3 text-right space-x-2 whitespace-nowrap">
-                          <a
-                            href={`/#product/${p.slug || p.productId}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-1.5 text-slate-400 hover:text-emerald-400 bg-slate-900 hover:bg-slate-800 rounded-lg inline-block"
-                            title="View Public Product Page"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
-                          <button
-                            type="button"
-                            onClick={() => handleCopyProductPublicLink(p)}
-                            className="p-1.5 text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-lg inline-block"
-                            title="Copy Product Link"
-                          >
-                            {prodCopiedSlug === p.productId ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-400" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openEditProductModal(p)}
-                            className="p-1.5 text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-lg inline-block"
-                            title="Edit Product"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteProduct(p)}
-                            className="p-1.5 text-slate-400 hover:text-rose-400 bg-slate-900 hover:bg-rose-950/40 rounded-lg inline-block"
-                            title="Delete Product"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="p-3 font-mono text-emerald-400">+৳{p.maxAffiliateIncrease}</td>
+                          <td className="p-3 font-mono text-slate-300">৳{p.adminBasePrice + p.maxAffiliateIncrease}</td>
+                          <td className="p-3 font-mono">{p.stockQuantity}</td>
+                          <td className="p-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleHeroSlider(p)}
+                              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                                p.featuredInHeroSlider
+                                  ? 'bg-emerald-950 text-emerald-300 border-emerald-800 hover:bg-emerald-900'
+                                  : 'bg-slate-900 text-slate-500 border-slate-800 hover:text-slate-300 hover:border-slate-700'
+                              }`}
+                              title={p.featuredInHeroSlider ? 'Checkmarked for Homepage Hero Slider' : 'Click to feature in Homepage Hero Slider'}
+                            >
+                              {p.featuredInHeroSlider ? (
+                                <>
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                  <span>Checked</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="w-3 h-3 rounded border border-slate-600 inline-block" />
+                                  <span>Add</span>
+                                </>
+                              )}
+                            </button>
+                          </td>
+                          <td className="p-3">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleProductActive(p)}
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                p.isActive ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-rose-950 text-rose-300 border border-rose-800'
+                              }`}
+                            >
+                              {p.isActive ? 'ACTIVE' : 'INACTIVE'}
+                            </button>
+                          </td>
+                          <td className="p-3 text-right space-x-1.5 whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => openEditProductModal(p)}
+                              className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1 shadow-sm transition-all cursor-pointer"
+                              title="Edit all product information"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                              <span>Edit</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => startQuickEdit(p)}
+                              className="px-2 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 rounded-lg text-xs font-medium inline-flex items-center gap-1 transition-all cursor-pointer"
+                              title="Quick edit name, category, price, stock"
+                            >
+                              <Sliders className="w-3 h-3 text-slate-400" />
+                              <span>Quick</span>
+                            </button>
+                            <a
+                              href={`/#product/${p.slug || p.productId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 text-slate-400 hover:text-emerald-400 bg-slate-900 hover:bg-slate-800 rounded-lg inline-block"
+                              title="View Public Product Page"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyProductPublicLink(p)}
+                              className="p-1.5 text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-lg inline-block"
+                              title="Copy Product Link"
+                            >
+                              {prodCopiedSlug === p.productId ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteProduct(p)}
+                              className="p-1.5 text-slate-400 hover:text-rose-400 bg-slate-900 hover:bg-rose-950/40 rounded-lg inline-block"
+                              title="Delete Product"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                     {filteredProducts.length === 0 && (
                       <tr>
                         <td colSpan={8} className="p-8 text-center text-slate-500">

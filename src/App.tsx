@@ -185,17 +185,18 @@ function AppContent() {
     };
   }, [setActiveAttribution, products]);
 
-  // Synchronize product detail view when products load or viewParam changes
+  // Synchronize product detail view when products load, viewParam changes, or product data is edited
   useEffect(() => {
-    if (currentView === 'product-detail' && viewParam && products.length > 0) {
-      if (!selectedProduct || (selectedProduct.slug !== viewParam && selectedProduct.productId !== viewParam)) {
-        const match = products.find(p => p.slug === viewParam || p.productId === viewParam);
+    if (currentView === 'product-detail' && products.length > 0) {
+      const targetIdentifier = viewParam || selectedProduct?.slug || selectedProduct?.productId;
+      if (targetIdentifier) {
+        const match = products.find(p => p.slug === targetIdentifier || p.productId === targetIdentifier);
         if (match) {
           setSelectedProduct(match);
         }
       }
     }
-  }, [currentView, viewParam, products, selectedProduct]);
+  }, [currentView, viewParam, products]);
 
   const handleNavigate = (view: string, param?: string) => {
     let targetView = view;
