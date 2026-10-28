@@ -26,6 +26,7 @@ import {
   AdminRole,
 } from '../types';
 import { updateDocumentFavicon } from '../utils/brandingPresets';
+import { sanitizeHeaderConfigForFirestore, getByteLength } from '../utils/brandingOptimizer';
 
 export const DEFAULT_HOMEPAGE_CMS: HomepageCMSConfig = {
   id: 'homepage',
@@ -431,15 +432,27 @@ export class CMSService {
     return local;
   }
 
-  static async saveHeaderConfig(config: HeaderConfig, adminEmail: string, adminUid: string): Promise<void> {
-    const updated = {
-      ...config,
+  static async saveHeaderConfig(config: HeaderConfig, adminEmail: string, adminUid: string): Promise<HeaderConfig> {
+    // 1. Sanitize and auto-compress oversized image data URLs (e.g. uploaded raw photos/favicons)
+    const sanitized = await sanitizeHeaderConfigForFirestore(config);
+    const updated: HeaderConfig = {
+      ...sanitized,
       updatedAt: new Date().toISOString(),
     };
+
+    // 2. Strict safeguard check against Firestore 1MiB limit (1,048,576 bytes)
+    const payloadBytes = getByteLength(JSON.stringify(updated));
+    if (payloadBytes > 950 * 1024) {
+      throw new Error(
+        `Branding configuration payload size (${Math.round(payloadBytes / 1024)} KB) exceeds Firestore's 1 MB document limit. Please use compressed PNG, SVG, or WebP images.`
+      );
+    }
+
     await setDoc(doc(db, 'cms', 'header'), updated);
     setLocalItem(CMS_HEADER_KEY, updated);
     this.applyBrandingToDocument(updated);
     await this.logActivity(adminUid, adminEmail, 'UPDATE_HEADER', 'Branding', 'Updated site logo, favicon, and header navigation').catch(() => {});
+    return updated;
   }
 
   // 3. Footer
