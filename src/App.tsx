@@ -7,6 +7,7 @@ import { Product, ProductCategory, Order } from './types';
 import { bootstrapDatabase, INITIAL_PRODUCTS, getLocalProducts, saveLocalProducts } from './services/seedData';
 import { CategoryService, DEFAULT_CATEGORIES, getLocalCategories } from './services/categoryService';
 import { AttributionEngine } from './services/pricingEngine';
+import { CMSService } from './services/cmsService';
 
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
@@ -65,11 +66,15 @@ function AppContent() {
       if (catList && catList.length > 0) {
         setCategories(catList);
       }
+
+      // Initialize site logo & browser favicon branding
+      await CMSService.getHeaderConfig().catch(() => {});
     } catch (err) {
       console.warn('Catalog load fallback to local/initial cache:', err);
       const local = getLocalProducts();
       setProducts(local.length > 0 ? local : INITIAL_PRODUCTS);
       setCategories(getLocalCategories());
+      CMSService.getHeaderConfig().catch(() => {});
     }
   };
 

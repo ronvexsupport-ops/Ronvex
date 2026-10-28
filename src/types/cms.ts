@@ -43,6 +43,12 @@ export interface HomepageCMS {
 
 export interface HeaderCMS {
   logoText: string;
+  logoUrl?: string;
+  logoDarkUrl?: string;
+  logoHeight?: number;
+  showWordmark?: boolean;
+  faviconUrl?: string;
+  appleTouchIconUrl?: string;
   announcementBarEnabled: boolean;
   announcementText: string;
   navLinks: Array<{

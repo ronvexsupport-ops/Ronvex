@@ -25,6 +25,7 @@ import {
   AdminUserRecord,
   AdminRole,
 } from '../types';
+import { updateDocumentFavicon } from '../utils/brandingPresets';
 
 export const DEFAULT_HOMEPAGE_CMS: HomepageCMSConfig = {
   id: 'homepage',
@@ -123,6 +124,13 @@ export const DEFAULT_HEADER_CONFIG: HeaderConfig = {
   id: 'header',
   brandName: 'RONVEX',
   logoUrl: '',
+  logoDarkUrl: '',
+  logoHeight: 32,
+  showWordmark: true,
+  logoAltText: 'RONVEX Premium Lifestyle & Tech Bangladesh',
+  faviconUrl: 'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23090d16%22%20%2F%3E%3Crect%20x%3D%222%22%20y%3D%222%22%20width%3D%2260%22%20height%3D%2260%22%20rx%3D%2212%22%20fill%3D%22none%22%20stroke%3D%22%23059669%22%20stroke-width%3D%222.5%22%20stroke-opacity%3D%220.8%22%20%2F%3E%3Cpath%20d%3D%22M22%2017h12c6%200%2010%203.5%2010%208.5%200%203.8-2.5%206.8-6.5%207.8L44%2047H36l-5.5-12H28v12H22V17zm6%206v7h6c2.5%200%204.5-1.2%204.5-3.5S36.5%2023%2034%2023h-6z%22%20fill%3D%22%23ffffff%22%20%2F%3E%3Ccircle%20cx%3D%2243%22%20cy%3D%2219%22%20r%3D%223.5%22%20fill%3D%22%2310b981%22%20%2F%3E%3C%2Fsvg%3E',
+  appleTouchIconUrl: '',
+  faviconPreset: 'emerald_crest',
   topNoticeEnabled: false,
   topNoticeText: '⚡ Flash Sale: Enjoy free delivery on orders above ৳3,000!',
   navItems: [
@@ -400,7 +408,12 @@ export class CMSService {
     await this.logActivity(adminUid, adminEmail, 'UPDATE_HOMEPAGE_CMS', 'CMS', 'Updated homepage builder content').catch(() => {});
   }
 
-  // 2. Header & Navigation
+  // 2. Header, Logo & Favicon
+  static applyBrandingToDocument(config?: Partial<HeaderConfig>): void {
+    if (!config) return;
+    updateDocumentFavicon(config.faviconUrl, config.appleTouchIconUrl);
+  }
+
   static async getHeaderConfig(): Promise<HeaderConfig> {
     const local = getLocalItem(CMS_HEADER_KEY, DEFAULT_HEADER_CONFIG);
     try {
@@ -408,11 +421,13 @@ export class CMSService {
       if (snap.exists()) {
         const data = snap.data() as HeaderConfig;
         setLocalItem(CMS_HEADER_KEY, data);
+        this.applyBrandingToDocument(data);
         return data;
       }
     } catch (e) {
       console.warn('CMSService: Error fetching header config, using local cache:', e);
     }
+    this.applyBrandingToDocument(local);
     return local;
   }
 
@@ -423,7 +438,8 @@ export class CMSService {
     };
     await setDoc(doc(db, 'cms', 'header'), updated);
     setLocalItem(CMS_HEADER_KEY, updated);
-    await this.logActivity(adminUid, adminEmail, 'UPDATE_HEADER', 'Header', 'Updated navigation links and header settings').catch(() => {});
+    this.applyBrandingToDocument(updated);
+    await this.logActivity(adminUid, adminEmail, 'UPDATE_HEADER', 'Branding', 'Updated site logo, favicon, and header navigation').catch(() => {});
   }
 
   // 3. Footer

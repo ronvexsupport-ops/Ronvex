@@ -91,14 +91,26 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, categor
 
       {/* 3-Zone Header Contract */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4 sm:gap-8">
-        {/* Zone 1: Brand Wordmark */}
+        {/* Zone 1: Brand Logo & Wordmark */}
         <div className="flex items-center gap-3 shrink-0">
           <button
             type="button"
             onClick={() => onNavigate('home')}
-            className="text-xl font-extrabold tracking-tight text-slate-950 font-serif hover:opacity-85 transition-opacity text-left"
+            className="flex items-center gap-2.5 hover:opacity-90 transition-opacity text-left group"
           >
-            {headerConfig.brandName || 'RONVEX'}
+            {headerConfig.logoUrl ? (
+              <img
+                src={headerConfig.logoUrl}
+                alt={headerConfig.logoAltText || headerConfig.brandName || 'Site Logo'}
+                style={{ height: `${headerConfig.logoHeight || 32}px`, maxHeight: '48px' }}
+                className="w-auto object-contain transition-transform group-hover:scale-[1.02]"
+              />
+            ) : null}
+            {(!headerConfig.logoUrl || headerConfig.showWordmark !== false) && (
+              <span className="text-xl font-extrabold tracking-tight text-slate-950 font-serif">
+                {headerConfig.brandName || 'RONVEX'}
+              </span>
+            )}
           </button>
           {activeAttribution && !affiliateStorefrontSlug && (
             <span className="hidden sm:inline-block text-[11px] text-slate-500 font-mono tracking-tight bg-slate-100 px-2 py-0.5 rounded">

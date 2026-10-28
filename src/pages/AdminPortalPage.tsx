@@ -121,6 +121,7 @@ import {
 } from '../services/cmsService';
 import { useAuth } from '../context/AuthContext';
 import { AdminLoginPage } from './AdminLoginPage';
+import { LogoFaviconSettings } from '../components/admin/LogoFaviconSettings';
 
 interface AdminPortalPageProps {
   products: Product[];
@@ -132,6 +133,7 @@ interface AdminPortalPageProps {
 export type AdminTab =
   | 'overview'
   | 'website_editor'
+  | 'branding_logo'
   | 'homepage_builder'
   | 'pages_content'
   | 'blog_posts'
@@ -1189,6 +1191,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
       group: 'Website CMS & Builder',
       items: [
         { id: 'website_editor' as AdminTab, label: 'Website Editor / CMS', icon: Globe },
+        { id: 'branding_logo' as AdminTab, label: 'Logo & Favicon', icon: Sparkles },
         { id: 'homepage_builder' as AdminTab, label: 'Homepage Builder', icon: Sliders },
         { id: 'pages_content' as AdminTab, label: 'Pages & Content', icon: FileText, badge: customPages.length },
         { id: 'blog_posts' as AdminTab, label: 'Blog Posts', icon: BookOpen, badge: blogPosts.length },
@@ -1240,13 +1243,24 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
           <button
             type="button"
             onClick={onNavigateHome}
-            className="flex items-center gap-2 hover:opacity-85 transition-opacity text-left"
+            className="flex items-center gap-2.5 hover:opacity-85 transition-opacity text-left"
           >
-            <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-serif font-black text-sm">
-              R
-            </div>
+            {headerConfig.logoUrl ? (
+              <img
+                src={headerConfig.logoUrl}
+                alt={headerConfig.brandName || 'Site Logo'}
+                style={{ height: '28px' }}
+                className="w-auto object-contain"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-serif font-black text-sm">
+                {(headerConfig.brandName || 'R').charAt(0)}
+              </div>
+            )}
             <div>
-              <span className="font-extrabold font-serif tracking-tight text-white text-base">RONVEX</span>
+              <span className="font-extrabold font-serif tracking-tight text-white text-base">
+                {headerConfig.brandName || 'RONVEX'}
+              </span>
               <span className="hidden sm:inline-block ml-2 text-[10px] tracking-wider uppercase text-emerald-400 font-semibold bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/50">
                 Operations Hub
               </span>
@@ -1607,7 +1621,20 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
               </div>
 
               {/* CMS Navigation Jump Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('branding_logo')}
+                  className="bg-slate-950 border border-emerald-500/30 hover:border-emerald-500 p-5 rounded-2xl text-left transition-all group shadow-sm ring-1 ring-emerald-500/10"
+                >
+                  <Sparkles className="w-6 h-6 text-emerald-400 mb-2 group-hover:scale-110 transition-transform" />
+                  <div className="text-sm font-bold text-white flex items-center justify-between">
+                    <span>Logo & Favicon</span>
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">NEW</span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">Upload brand logo, configure sizing slider, and set browser tab favicons</p>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setActiveTab('homepage_builder')}
@@ -1639,6 +1666,18 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                 </button>
               </div>
             </div>
+          )}
+
+          {/* DEDICATED LOGO & FAVICON STUDIO */}
+          {activeTab === 'branding_logo' && (
+            <LogoFaviconSettings
+              headerConfig={headerConfig}
+              onUpdateHeaderConfig={setHeaderConfig}
+              adminEmail={adminEmail}
+              adminUid={adminUid}
+              onSuccess={msg => setActionSuccess(msg)}
+              onError={msg => setActionError(msg)}
+            />
           )}
 
           {/* 3. HOMEPAGE BUILDER */}
@@ -2252,6 +2291,29 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                 </button>
               </div>
 
+              {/* Logo & Favicon Studio Callout Banner */}
+              <div className="p-4 bg-emerald-950/20 border border-emerald-500/30 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20 shrink-0">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-white">Want to change your site Logo or browser Favicon?</h3>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Upload custom images, adjust scaling height, pick presets, and see live browser tab previews in our dedicated studio.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('branding_logo')}
+                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Open Logo & Favicon Studio</span>
+                </button>
+              </div>
+
               <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -2380,15 +2442,25 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                   <h1 className="text-2xl font-bold font-serif text-white">Theme & Appearance</h1>
                   <p className="text-xs text-slate-400 mt-1">Configure brand color palette, font styles, and header accents</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleSaveThemeConfig}
-                  disabled={savingCMS}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white rounded-xl flex items-center gap-2"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>Save Theme</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('branding_logo')}
+                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-emerald-400 rounded-xl flex items-center gap-1.5 border border-slate-700 transition-colors"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Logo & Favicon Studio</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveThemeConfig}
+                    disabled={savingCMS}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white rounded-xl flex items-center gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Save Theme</span>
+                  </button>
+                </div>
               </div>
 
               <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 space-y-4">

@@ -388,6 +388,13 @@ export interface HeaderConfig {
   id: string; // 'header'
   brandName: string;
   logoUrl?: string;
+  logoDarkUrl?: string;
+  logoHeight?: number; // In px, e.g. 24 to 72
+  showWordmark?: boolean; // If true, displays brand text next to the logo
+  logoAltText?: string;
+  faviconUrl?: string; // Browser tab favicon (.ico, .png, .svg, or data URI)
+  appleTouchIconUrl?: string; // 180x180 Apple touch icon for mobile
+  faviconPreset?: string;
   topNoticeEnabled: boolean;
   topNoticeText: string;
   navItems: NavItem[];
