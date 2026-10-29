@@ -18,7 +18,6 @@ import {
   Heart,
   Award,
   Lock,
-  MessageCircle,
   ZoomIn,
   ZoomOut,
   RotateCcw as ResetIcon,
@@ -333,13 +332,6 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const toggleAccordion = (section: string) => {
     setOpenAccordion(prev => (prev === section ? null : section));
   };
-
-  // WhatsApp Pre-filled message
-  const whatsappNumber = '8801700000000';
-  const whatsappMessage = encodeURIComponent(
-    `Hello! I am interested in purchasing:\n\n*${product.name}*\nBrand: ${product.brand || 'JAZMIN'}\nSKU: ${product.sku || product.productId}\nPrice: BDT ${displayPrice.toLocaleString()}\n\nCould you please confirm availability and delivery?`
-  );
-  const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${whatsappMessage}`;
 
   const related = allProducts
     .filter(p => p.productId !== product.productId && (p.categoryId === product.categoryId || p.isActive))
@@ -1297,18 +1289,6 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           </div>
         )}
       </div>
-
-      {/* Floating WhatsApp Action Button in Bottom-Right Corner (matching reference screenshot) */}
-      <a
-        href={whatsappUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Chat on WhatsApp"
-        className="fixed bottom-6 right-6 z-40 bg-[#25D366] hover:bg-[#20ba59] text-white p-3.5 rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all flex items-center justify-center cursor-pointer ring-4 ring-white/30"
-        title="Chat with our stylist on WhatsApp"
-      >
-        <MessageCircle className="w-7 h-7 fill-white text-[#25D366]" />
-      </a>
 
       {/* Full-Screen High-Resolution Lightbox Zoom Modal */}
       {isLightboxOpen && (

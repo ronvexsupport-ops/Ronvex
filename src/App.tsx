@@ -14,6 +14,7 @@ import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { CartDrawer } from './components/CartDrawer';
 import { DiagnosticModal } from './components/DiagnosticModal';
+import { WhatsAppButton } from './components/WhatsAppButton';
 
 import { HomePage } from './pages/HomePage';
 import { ShopPage } from './pages/ShopPage';
@@ -392,6 +393,9 @@ function AppContent() {
         onNavigate={handleNavigate}
         onOpenDiagnostics={() => setShowDiagnostics(true)}
       />
+
+      {/* Floating WhatsApp Action Button on Every Page */}
+      <WhatsAppButton phoneNumber="01954868068" />
     </div>
   );
 }
