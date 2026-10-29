@@ -4,6 +4,7 @@ import { db, testFirestoreConnection } from './services/firebase';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider, useCart } from './context/CartContext';
 import { WishlistProvider } from './context/WishlistContext';
+import { CompareProvider } from './context/CompareContext';
 import { Product, ProductCategory, Order } from './types';
 import { bootstrapDatabase, INITIAL_PRODUCTS, getLocalProducts, saveLocalProducts } from './services/seedData';
 import { CategoryService, DEFAULT_CATEGORIES, getLocalCategories } from './services/categoryService';
@@ -15,6 +16,8 @@ import { Footer } from './components/Footer';
 import { CartDrawer } from './components/CartDrawer';
 import { DiagnosticModal } from './components/DiagnosticModal';
 import { WhatsAppButton } from './components/WhatsAppButton';
+import { CompareFloatingBar } from './components/CompareFloatingBar';
+import { CompareModal } from './components/CompareModal';
 
 import { HomePage } from './pages/HomePage';
 import { ShopPage } from './pages/ShopPage';
@@ -394,6 +397,12 @@ function AppContent() {
         onOpenDiagnostics={() => setShowDiagnostics(true)}
       />
 
+      {/* Floating Product Comparison Dock */}
+      <CompareFloatingBar onSelectProduct={handleSelectProduct} />
+
+      {/* Side-by-Side Product Comparison Modal */}
+      <CompareModal allProducts={products} onSelectProduct={handleSelectProduct} />
+
       {/* Floating WhatsApp Action Button on Every Page */}
       <WhatsAppButton phoneNumber="01954868068" />
     </div>
@@ -405,7 +414,9 @@ export default function App() {
     <AuthProvider>
       <CartProvider>
         <WishlistProvider>
-          <AppContent />
+          <CompareProvider>
+            <AppContent />
+          </CompareProvider>
         </WishlistProvider>
       </CartProvider>
     </AuthProvider>

@@ -27,11 +27,13 @@ import {
   CheckCircle2,
   User,
   Sparkles,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { Product, ProductReview, ProductRatingSummary } from '../types';
 import { PricingEngine } from '../services/pricingEngine';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
+import { useCompare } from '../context/CompareContext';
 import { ImageService, DEFAULT_FALLBACK_IMAGE } from '../services/imageService';
 import { ReviewService } from '../services/reviewService';
 import { ProductCard } from '../components/ProductCard';
@@ -56,7 +58,9 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 }) => {
   const { addToCart } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
+  const { isInCompare, toggleCompare } = useCompare();
   const isWishlisted = isInWishlist(product.productId);
+  const isCompared = isInCompare(product.productId);
   const [quantity, setQuantity] = useState(1);
 
   // Normalize images
@@ -362,24 +366,42 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             </span>
           </nav>
 
-          <button
-            type="button"
-            onClick={handleCopyProductLink}
-            className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-900 transition-colors"
-            title="Share Product"
-          >
-            {copiedLink ? (
-              <>
-                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                <span className="text-emerald-700 font-semibold">Link Copied</span>
-              </>
-            ) : (
-              <>
-                <Share2 className="w-3.5 h-3.5" />
-                <span>Share</span>
-              </>
-            )}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => toggleCompare(product)}
+              className={`inline-flex items-center gap-1 text-[11px] font-medium transition-colors cursor-pointer ${
+                isCompared
+                  ? 'text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-200'
+                  : 'text-slate-500 hover:text-purple-700'
+              }`}
+              title={isCompared ? 'Remove from comparison' : 'Compare with other products (up to 3)'}
+            >
+              <ArrowLeftRight className={`w-3.5 h-3.5 ${isCompared ? 'text-purple-700' : ''}`} />
+              <span>{isCompared ? 'In Compare (Selected)' : 'Compare'}</span>
+            </button>
+
+            <span className="text-slate-300">·</span>
+
+            <button
+              type="button"
+              onClick={handleCopyProductLink}
+              className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-900 transition-colors"
+              title="Share Product"
+            >
+              {copiedLink ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="text-emerald-700 font-semibold">Link Copied</span>
+                </>
+              ) : (
+                <>
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>Share</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Main Product Grid */}
@@ -646,6 +668,21 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   }`}
                 >
                   <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-rose-600 text-rose-600' : ''}`} />
+                </button>
+
+                {/* Compare Button */}
+                <button
+                  type="button"
+                  onClick={() => toggleCompare(product)}
+                  aria-label={isCompared ? "Remove from comparison" : "Add to comparison"}
+                  title={isCompared ? "Remove from comparison" : "Compare product (up to 3)"}
+                  className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
+                    isCompared
+                      ? 'border-purple-600 bg-purple-50 text-purple-700'
+                      : 'border-slate-300 text-slate-600 hover:border-purple-400 hover:text-purple-700'
+                  }`}
+                >
+                  <ArrowLeftRight className={`w-4 h-4 ${isCompared ? 'text-purple-700' : ''}`} />
                 </button>
               </div>
             </div>

@@ -1,9 +1,10 @@
 import React from 'react';
-import { ShoppingBag, ArrowRight, Heart, Star } from 'lucide-react';
+import { ShoppingBag, ArrowRight, Heart, Star, ArrowLeftRight } from 'lucide-react';
 import { Product } from '../types';
 import { PricingEngine } from '../services/pricingEngine';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
+import { useCompare } from '../context/CompareContext';
 import { ImageService, DEFAULT_FALLBACK_IMAGE } from '../services/imageService';
 
 interface ProductCardProps {
@@ -21,7 +22,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 }) => {
   const { addToCart } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
+  const { isInCompare, toggleCompare } = useCompare();
   const isWishlisted = isInWishlist(product.productId);
+  const isCompared = isInCompare(product.productId);
   const displayPrice = customSellingPrice !== undefined ? customSellingPrice : product.adminBasePrice;
   const imageUrl = ImageService.resolveProductImage(product.imageUrls?.[0], product.categoryId);
 
@@ -79,6 +82,25 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           aria-label={isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}
         >
           <Heart className={`w-3.5 h-3.5 ${isWishlisted ? 'fill-rose-500 text-rose-500' : ''}`} />
+        </button>
+
+        {/* Compare Toggle Button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleCompare(product);
+          }}
+          className={`absolute top-10.5 right-2.5 p-1.5 rounded-full transition-all duration-200 z-20 cursor-pointer shadow-xs ${
+            isCompared
+              ? 'bg-purple-600 text-white scale-105 shadow-purple-600/30'
+              : 'bg-white/80 hover:bg-white text-slate-500 hover:text-purple-600'
+          }`}
+          title={isCompared ? 'Remove from comparison' : 'Compare product (up to 3)'}
+          aria-label={isCompared ? 'Remove from comparison' : 'Add to comparison'}
+        >
+          <ArrowLeftRight className="w-3.5 h-3.5" />
         </button>
 
         {product.imageUrls && product.imageUrls.length > 1 && (

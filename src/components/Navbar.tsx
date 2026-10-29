@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Search, User, ShieldCheck, TrendingUp, LogOut, ChevronDown, Menu, X, ArrowRight, Lock, Heart } from 'lucide-react';
+import { ShoppingBag, Search, User, ShieldCheck, TrendingUp, LogOut, ChevronDown, Menu, X, ArrowRight, Lock, Heart, ArrowLeftRight } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
+import { useCompare } from '../context/CompareContext';
 import { CMSService, DEFAULT_HEADER_CONFIG } from '../services/cmsService';
 import { HeaderConfig, ProductCategory } from '../types';
 
@@ -16,6 +17,7 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, categories, affiliateStorefrontSlug }) => {
   const { itemCount, setIsCartOpen, activeAttribution } = useCart();
   const { wishlistCount } = useWishlist();
+  const { compareCount, openCompareModal } = useCompare();
   const { currentUser, appUser, adminRecord, isAdmin, isAffiliate, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -320,6 +322,24 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, categor
             )}
           </button>
 
+          {/* Compare Trigger */}
+          <button
+            type="button"
+            onClick={openCompareModal}
+            className={`relative p-2 transition-colors rounded-lg hover:bg-slate-100 cursor-pointer ${
+              compareCount > 0 ? 'text-purple-700 bg-purple-50' : 'text-slate-700 hover:text-purple-700'
+            }`}
+            aria-label={`Compare Products (${compareCount}/3)`}
+            title={`Compare Products (${compareCount}/3)`}
+          >
+            <ArrowLeftRight className="w-5 h-5" />
+            {compareCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-[10px] font-bold h-4 min-w-4 px-1 rounded-full flex items-center justify-center tabular-nums shadow-xs">
+                {compareCount}
+              </span>
+            )}
+          </button>
+
           {/* Cart Trigger */}
           <button
             type="button"
@@ -411,6 +431,26 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, categor
               {wishlistCount > 0 && (
                 <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-xs font-bold rounded-full">
                   {wishlistCount}
+                </span>
+              )}
+            </button>
+
+            {/* Mobile Product Comparison Access */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowMobileMenu(false);
+                openCompareModal();
+              }}
+              className="text-left py-2 px-3 hover:bg-purple-50 text-slate-800 rounded-lg flex items-center justify-between"
+            >
+              <div className="flex items-center gap-2 font-medium">
+                <ArrowLeftRight className={`w-4 h-4 ${compareCount > 0 ? 'text-purple-700' : 'text-slate-500'}`} />
+                <span>Compare Products</span>
+              </div>
+              {compareCount > 0 && (
+                <span className="px-2 py-0.5 bg-purple-100 text-purple-800 text-xs font-bold rounded-full">
+                  {compareCount}/3
                 </span>
               )}
             </button>
