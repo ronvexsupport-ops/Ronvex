@@ -122,6 +122,13 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { AdminLoginPage } from './AdminLoginPage';
 import { LogoFaviconSettings } from '../components/admin/LogoFaviconSettings';
+import {
+  generateAutoSku,
+  getSkuSuggestions,
+  isSkuUnique,
+  SkuPattern,
+} from '../utils/skuGenerator';
+import { getByteLength } from '../utils/brandingOptimizer';
 
 // Recursively sanitize objects so no undefined fields ever reach Firestore setDoc/updateDoc
 export function sanitizeProductForFirestore(obj: Record<string, any>): Record<string, any> {
@@ -236,6 +243,9 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
   // Luxury Designer / SJ Closet Product fields
   const [prodBrand, setProdBrand] = useState('JAZMIN');
   const [prodSku, setProdSku] = useState('SJ0025');
+  const [prodSkuPattern, setProdSkuPattern] = useState<SkuPattern>('SJ_SEQUENCE');
+  const [prodIsSkuCustom, setProdIsSkuCustom] = useState(false);
+  const [savingProduct, setSavingProduct] = useState(false);
   const [prodOriginalPrice, setProdOriginalPrice] = useState<number>(0);
   const [prodStitchingType, setProdStitchingType] = useState('Unstitched');
   const [prodStockUrgencyText, setProdStockUrgencyText] = useState('Only 1 left in stock');
@@ -246,6 +256,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
   // Inline Quick Edit state for table rows
   const [quickEditId, setQuickEditId] = useState<string | null>(null);
   const [quickName, setQuickName] = useState('');
+  const [quickSku, setQuickSku] = useState('');
   const [quickCategory, setQuickCategory] = useState('');
   const [quickBasePrice, setQuickBasePrice] = useState<number>(0);
   const [quickOriginalPrice, setQuickOriginalPrice] = useState<number>(0);
@@ -613,7 +624,20 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     setProdBasePrice(4300);
     setProdOriginalPrice(5100);
     setProdBrand('JAZMIN');
-    setProdSku(`SJ00${Math.floor(10 + Math.random() * 89)}`);
+
+    // Auto-generate unique next SKU using intelligent sequence scanner
+    const existingSkus = productList.map(p => p.sku || '').filter(Boolean);
+    const autoSku = generateAutoSku({
+      brand: 'JAZMIN',
+      categoryName: defaultCat.name,
+      categoryId: defaultCat.categoryId,
+      existingSkus,
+      pattern: 'SJ_SEQUENCE',
+    });
+    setProdSku(autoSku);
+    setProdSkuPattern('SJ_SEQUENCE');
+    setProdIsSkuCustom(false);
+
     setProdStitchingType('Unstitched');
     setProdStockUrgencyText('Only 1 left in stock');
     setProdDisclaimer('Product color may slightly vary due to photographic lighting sources or your device monitor settings. Dry clean recommended. Do not bleach.');
@@ -644,6 +668,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     setProdOriginalPrice(p.originalPrice || 0);
     setProdBrand(p.brand || 'JAZMIN');
     setProdSku(p.sku || p.productId);
+    setProdIsSkuCustom(true);
     setProdStitchingType(p.stitchingType || 'Unstitched');
     setProdStockUrgencyText(p.stockUrgencyText || (p.stockQuantity <= 3 ? `Only ${p.stockQuantity} left in stock` : ''));
     setProdDisclaimer(p.disclaimer || 'Product color may slightly vary due to photographic lighting sources or your device monitor settings. Dry clean recommended. Do not bleach.');
@@ -655,6 +680,40 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     setProdImageUrl(firstImg || DEFAULT_FALLBACK_IMAGE);
     setProdAdditionalImages(restImgs || []);
     setShowProductModal(true);
+  };
+
+  const handleGenerateSku = (pattern?: SkuPattern) => {
+    const chosenPattern = pattern || prodSkuPattern;
+    const existingSkus = productList
+      .filter(p => !editingProduct || p.productId !== editingProduct.productId)
+      .map(p => p.sku || '')
+      .filter(Boolean);
+    const newSku = generateAutoSku({
+      brand: prodBrand.trim() || 'JAZMIN',
+      categoryName: prodCategoryName,
+      categoryId: prodCategory,
+      existingSkus,
+      pattern: chosenPattern,
+    });
+    setProdSku(newSku);
+    if (pattern) setProdSkuPattern(pattern);
+    setProdIsSkuCustom(false);
+  };
+
+  const handleBrandChange = (brand: string) => {
+    setProdBrand(brand);
+    // If SKU hasn't been custom typed or it's a new product, auto-update with fresh brand prefix
+    if (!prodIsSkuCustom && !editingProduct) {
+      const existingSkus = productList.map(p => p.sku || '').filter(Boolean);
+      const newSku = generateAutoSku({
+        brand: brand.trim() || 'JAZMIN',
+        categoryName: prodCategoryName,
+        categoryId: prodCategory,
+        existingSkus,
+        pattern: prodSkuPattern,
+      });
+      setProdSku(newSku);
+    }
   };
 
   const handleToggleHeroSlider = async (p: Product) => {
@@ -778,61 +837,94 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     const foundCat = categories.find(c => c.categoryId === prodCategory);
     const categoryName = foundCat ? foundCat.name : prodCategoryName;
 
-    // Resolve main and additional image URLs without overriding user uploads
-    const finalImageUrl = ImageService.resolveProductImage(prodImageUrl.trim(), prodCategory);
-    const resolvedAdditional = prodAdditionalImages
-      .map(u => ImageService.resolveProductImage(u.trim(), prodCategory))
-      .filter(u => u && u.trim().length > 0);
+    // Ensure SKU is auto-generated if missing
+    const existingSkus = productList
+      .filter(p => !editingProduct || p.productId !== editingProduct.productId)
+      .map(p => p.sku || '')
+      .filter(Boolean);
 
-    const combinedImages = Array.from(new Set([finalImageUrl, ...resolvedAdditional]));
-
-    const origPriceNum = Number(prodOriginalPrice);
-    const basePriceNum = Number(prodBasePrice);
-    const discountPct = (origPriceNum > basePriceNum && origPriceNum > 0)
-      ? Math.round(((origPriceNum - basePriceNum) / origPriceNum) * 100)
-      : undefined;
-
-    const rawPayload: Record<string, any> = {
-      productId,
-      name: prodName.trim(),
-      slug: cleanSlug,
-      brand: prodBrand.trim() || 'JAZMIN',
-      sku: prodSku.trim() || productId,
-      description: prodDesc.trim(),
-      categoryId: prodCategory,
-      categoryName,
-      adminBasePrice: basePriceNum,
-      stitchingType: prodStitchingType.trim() || 'Unstitched',
-      disclaimer: prodDisclaimer.trim(),
-      returnPolicy: prodReturnPolicy.trim(),
-      shippingPolicy: prodShippingPolicy.trim(),
-      maxAffiliateIncrease: Number(prodMaxIncrease) || 0,
-      stockQuantity: Number(prodStock) || 0,
-      imageUrls: combinedImages,
-      isActive: editingProduct ? editingProduct.isActive : true,
-      featuredInHeroSlider: prodInHeroSlider,
-      heroOfferTitle: prodHeroOfferTitle.trim(),
-      createdAt: editingProduct ? editingProduct.createdAt : new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (origPriceNum > 0) {
-      rawPayload.originalPrice = origPriceNum;
-    }
-    if (discountPct !== undefined && discountPct > 0) {
-      rawPayload.discountPercent = discountPct;
-    }
-    if (prodStockUrgencyText.trim()) {
-      rawPayload.stockUrgencyText = prodStockUrgencyText.trim();
+    let finalSku = prodSku.trim().toUpperCase();
+    if (!finalSku) {
+      finalSku = generateAutoSku({
+        brand: prodBrand.trim() || 'JAZMIN',
+        categoryName,
+        categoryId: prodCategory,
+        existingSkus,
+        pattern: prodSkuPattern,
+      });
     }
 
-    // Completely sanitize payload to eliminate any undefined values for Firestore
-    const cleanedPayload = sanitizeProductForFirestore(rawPayload) as Product;
+    setSavingProduct(true);
+    setActionError(null);
 
-    // Persist to Firestore first as source of truth
     try {
+      // Resolve main and additional image URLs without overriding user uploads
+      const finalImageUrl = ImageService.resolveProductImage(prodImageUrl.trim(), prodCategory);
+      const resolvedAdditional = prodAdditionalImages
+        .map(u => ImageService.resolveProductImage(u.trim(), prodCategory))
+        .filter(u => u && u.trim().length > 0);
+
+      const rawCombinedImages = Array.from(new Set([finalImageUrl, ...resolvedAdditional]));
+
+      // FIRESTORE 1MB LIMIT FIX: Compress and optimize image data URLs to guarantee payload fits comfortably
+      const optimizedImages = await ImageService.optimizeProductImageSet(rawCombinedImages, 550000);
+
+      const origPriceNum = Number(prodOriginalPrice);
+      const basePriceNum = Number(prodBasePrice);
+      const discountPct = (origPriceNum > basePriceNum && origPriceNum > 0)
+        ? Math.round(((origPriceNum - basePriceNum) / origPriceNum) * 100)
+        : undefined;
+
+      const rawPayload: Record<string, any> = {
+        productId,
+        name: prodName.trim(),
+        slug: cleanSlug,
+        brand: prodBrand.trim() || 'JAZMIN',
+        sku: finalSku,
+        description: prodDesc.trim(),
+        categoryId: prodCategory,
+        categoryName,
+        adminBasePrice: basePriceNum,
+        stitchingType: prodStitchingType.trim() || 'Unstitched',
+        disclaimer: prodDisclaimer.trim(),
+        returnPolicy: prodReturnPolicy.trim(),
+        shippingPolicy: prodShippingPolicy.trim(),
+        maxAffiliateIncrease: Number(prodMaxIncrease) || 0,
+        stockQuantity: Number(prodStock) || 0,
+        imageUrls: optimizedImages,
+        isActive: editingProduct ? editingProduct.isActive : true,
+        featuredInHeroSlider: prodInHeroSlider,
+        heroOfferTitle: prodHeroOfferTitle.trim(),
+        createdAt: editingProduct ? editingProduct.createdAt : new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (origPriceNum > 0) {
+        rawPayload.originalPrice = origPriceNum;
+      }
+      if (discountPct !== undefined && discountPct > 0) {
+        rawPayload.discountPercent = discountPct;
+      }
+      if (prodStockUrgencyText.trim()) {
+        rawPayload.stockUrgencyText = prodStockUrgencyText.trim();
+      }
+
+      // Completely sanitize payload to eliminate any undefined values for Firestore
+      let cleanedPayload = sanitizeProductForFirestore(rawPayload) as Product;
+
+      // Strict payload safety verification against Firestore 1,048,576 byte limit
+      const payloadBytes = getByteLength(JSON.stringify(cleanedPayload));
+      if (payloadBytes > 800000) {
+        const ultraCompact = await ImageService.optimizeProductImageSet(cleanedPayload.imageUrls || [], 350000);
+        cleanedPayload = {
+          ...cleanedPayload,
+          imageUrls: ultraCompact,
+        };
+      }
+
+      // Persist to Firestore first as source of truth
       await setDoc(doc(db, 'products', productId), cleanedPayload);
-      await CMSService.logActivity(adminUid, adminEmail, 'SAVE_PRODUCT', 'Products', `Saved product: ${prodName}`).catch(() => {});
+      await CMSService.logActivity(adminUid, adminEmail, 'SAVE_PRODUCT', 'Products', `Saved product: ${prodName} (SKU: ${finalSku})`).catch(() => {});
 
       // Persist to local storage cache
       saveSingleProductLocally(cleanedPayload);
@@ -849,12 +941,14 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
       });
 
       setShowProductModal(false);
-      setActionSuccess(`Product "${prodName}" saved successfully and is now live on the storefront!`);
+      setActionSuccess(`Product "${prodName}" (SKU: ${finalSku}) saved live on storefront!`);
       onRefreshProducts();
       fetchAllData();
     } catch (err: any) {
       console.error('Failed to save product to database:', err);
       setActionError(err.message || 'Failed to save product to database.');
+    } finally {
+      setSavingProduct(false);
     }
   };
 
@@ -862,6 +956,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
   const startQuickEdit = (p: Product) => {
     setQuickEditId(p.productId);
     setQuickName(p.name);
+    setQuickSku(p.sku || '');
     setQuickCategory(p.categoryId);
     setQuickBasePrice(p.adminBasePrice);
     setQuickOriginalPrice(p.originalPrice || 0);
@@ -894,6 +989,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
       const updatedData: Record<string, any> = {
         ...existing,
         name: quickName.trim(),
+        sku: quickSku.trim().toUpperCase() || existing.sku || existing.productId,
         categoryId: quickCategory,
         categoryName: catName,
         adminBasePrice: baseNum,
@@ -2839,17 +2935,49 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                                     placeholder="Product title"
                                   />
                                 </div>
-                                <div>
-                                  <label className="block text-[10px] text-slate-400 font-medium mb-1">Category</label>
-                                  <select
-                                    value={quickCategory}
-                                    onChange={e => setQuickCategory(e.target.value)}
-                                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white"
-                                  >
-                                    {categories.map(c => (
-                                      <option key={c.categoryId} value={c.categoryId}>{c.name}</option>
-                                    ))}
-                                  </select>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <div className="flex items-center justify-between mb-1">
+                                      <label className="text-[10px] text-slate-400 font-medium">SKU Number</label>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const existingSkus = productList.filter(item => item.productId !== p.productId).map(item => item.sku || '');
+                                          const nextSku = generateAutoSku({
+                                            brand: p.brand || 'JAZMIN',
+                                            categoryName: p.categoryName,
+                                            categoryId: quickCategory,
+                                            existingSkus,
+                                            pattern: 'SJ_SEQUENCE',
+                                          });
+                                          setQuickSku(nextSku);
+                                        }}
+                                        className="text-[9px] text-emerald-400 hover:text-emerald-300 font-medium cursor-pointer"
+                                        title="Auto-generate next unique SKU"
+                                      >
+                                        Auto-Gen
+                                      </button>
+                                    </div>
+                                    <input
+                                      type="text"
+                                      value={quickSku}
+                                      onChange={e => setQuickSku(e.target.value.toUpperCase())}
+                                      className="w-full px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white font-mono uppercase font-bold"
+                                      placeholder="SKU Code"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] text-slate-400 font-medium mb-1">Category</label>
+                                    <select
+                                      value={quickCategory}
+                                      onChange={e => setQuickCategory(e.target.value)}
+                                      className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white"
+                                    >
+                                      {categories.map(c => (
+                                        <option key={c.categoryId} value={c.categoryId}>{c.name}</option>
+                                      ))}
+                                    </select>
+                                  </div>
                                 </div>
                               </div>
                             </td>
@@ -4012,28 +4140,102 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">Brand Name *</label>
                   <input
                     type="text"
                     value={prodBrand}
-                    onChange={e => setProdBrand(e.target.value)}
+                    onChange={e => handleBrandChange(e.target.value)}
                     placeholder="e.g. JAZMIN or SJ CLOSET"
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white uppercase font-semibold"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">SKU Code *</label>
-                  <input
-                    type="text"
-                    value={prodSku}
-                    onChange={e => setProdSku(e.target.value)}
-                    placeholder="e.g. SJ0025"
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono uppercase"
-                    required
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs text-slate-400 font-medium">SKU Number *</label>
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateSku()}
+                      className="text-[11px] text-emerald-400 hover:text-emerald-300 font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Auto-generate next unique SKU"
+                    >
+                      <Sparkles className="w-3 h-3 text-emerald-400" />
+                      <span>Auto-Generate SKU</span>
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={prodSku}
+                      onChange={e => {
+                        setProdSku(e.target.value.toUpperCase());
+                        setProdIsSkuCustom(true);
+                      }}
+                      placeholder="e.g. SJ0025 or JAZ-1026"
+                      className="w-full pl-3 pr-8 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-mono uppercase font-bold tracking-wider"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateSku()}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-emerald-400 transition-colors cursor-pointer"
+                      title="Regenerate SKU"
+                    >
+                      <RotateCw className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* SKU Style Presets & Status */}
+                  <div className="mt-1.5 flex items-center justify-between gap-1 flex-wrap">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-slate-500">Pattern:</span>
+                      {(['SJ_SEQUENCE', 'BRAND_NUMBER', 'CATEGORY_BRAND', 'RONVEX_CODE'] as SkuPattern[]).map(patt => (
+                        <button
+                          key={patt}
+                          type="button"
+                          onClick={() => handleGenerateSku(patt)}
+                          className={`text-[9px] px-1.5 py-0.5 rounded font-mono transition-colors cursor-pointer ${
+                            prodSkuPattern === patt
+                              ? 'bg-emerald-950 text-emerald-300 border border-emerald-700'
+                              : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+                          }`}
+                        >
+                          {patt === 'SJ_SEQUENCE' ? 'SJ Sequence' : patt === 'BRAND_NUMBER' ? 'Brand' : patt === 'CATEGORY_BRAND' ? 'Cat+Brand' : 'RONVEX'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Uniqueness feedback badge */}
+                    {prodSku.trim() && (
+                      <span className={`text-[10px] font-medium flex items-center gap-0.5 ${
+                        isSkuUnique(
+                          prodSku,
+                          productList.filter(p => !editingProduct || p.productId !== editingProduct.productId).map(p => p.sku || ''),
+                          editingProduct?.sku
+                        )
+                          ? 'text-emerald-400'
+                          : 'text-rose-400'
+                      }`}>
+                        {isSkuUnique(
+                          prodSku,
+                          productList.filter(p => !editingProduct || p.productId !== editingProduct.productId).map(p => p.sku || ''),
+                          editingProduct?.sku
+                        ) ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-400" />
+                            <span>Unique</span>
+                          </>
+                        ) : (
+                          <>
+                            <AlertCircle className="w-3 h-3 text-rose-400" />
+                            <span>Duplicate SKU</span>
+                          </>
+                        )}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -4431,9 +4633,17 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-md"
+                  disabled={savingProduct}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-md flex items-center gap-2 disabled:opacity-50 cursor-pointer"
                 >
-                  {editingProduct ? 'Update Product' : 'Create Product'}
+                  {savingProduct ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Optimizing & Saving...</span>
+                    </>
+                  ) : (
+                    <span>{editingProduct ? 'Update Product' : 'Create Product'}</span>
+                  )}
                 </button>
               </div>
             </form>

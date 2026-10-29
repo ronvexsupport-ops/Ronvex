@@ -168,7 +168,7 @@ export class ImageService {
 
   /**
    * Upload file and optimize into a high-clarity, lightweight Data URL.
-   * Compresses through canvas to 1200px max dimension and ~80KB JPEG/WebP so multiple
+   * Compresses through canvas to 920px max dimension and ~40-60KB JPEG so multiple
    * photos effortlessly fit within Firestore document limits and load swiftly.
    */
   public static async uploadImage(file: File): Promise<string> {
@@ -190,7 +190,7 @@ export class ImageService {
         const img = new Image();
         img.onload = () => {
           try {
-            const maxDimension = 1200; // Sharp HD resolution for product detail & zoom
+            const maxDimension = 920; // Crisp HD resolution for product detail and zoom
             let width = img.width;
             let height = img.height;
 
@@ -213,16 +213,15 @@ export class ImageService {
               return;
             }
 
-            // Clean white background for transparent images
+            // Clean white background
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, width, height);
             ctx.drawImage(img, 0, 0, width, height);
 
-            // Compress to crisp quality JPEG (~40-80KB per photo)
-            const compressedUrl = canvas.toDataURL('image/jpeg', 0.82);
+            // Compress to crisp quality JPEG (~35-55KB per photo)
+            const compressedUrl = canvas.toDataURL('image/jpeg', 0.74);
             resolve(compressedUrl);
           } catch (e) {
-            // Fallback to raw if canvas processing meets any browser constraint
             resolve(rawResult);
           }
         };
@@ -232,6 +231,105 @@ export class ImageService {
       reader.onerror = () => reject(new Error('Failed to read image file data'));
       reader.readAsDataURL(file);
     });
+  }
+
+  /**
+   * Compresses an existing Data URL if it is larger than maxBytes (default 80KB)
+   */
+  public static async compressDataUrl(
+    dataUrl: string,
+    maxDimension: number = 850,
+    quality: number = 0.72
+  ): Promise<string> {
+    if (!dataUrl || !dataUrl.startsWith('data:image/')) {
+      return dataUrl;
+    }
+
+    // If already lightweight (< 70KB), keep as-is
+    if (dataUrl.length < 70000) {
+      return dataUrl;
+    }
+
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            } else {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(dataUrl);
+            return;
+          }
+
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const compressed = canvas.toDataURL('image/jpeg', quality);
+          resolve(compressed);
+        } catch {
+          resolve(dataUrl);
+        }
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    });
+  }
+
+  /**
+   * Optimizes an entire array of product image URLs so the total payload is guaranteed
+   * to fit comfortably within Firestore's 1MiB (1,048,576 byte) document size limit.
+   */
+  public static async optimizeProductImageSet(
+    imageUrls: string[],
+    maxTotalBytes: number = 600000
+  ): Promise<string[]> {
+    if (!imageUrls || imageUrls.length === 0) return [];
+
+    // Step 1: Compress each individual data URL
+    const optimizedUrls: string[] = [];
+    for (const url of imageUrls) {
+      if (url && url.startsWith('data:image/')) {
+        const compressed = await this.compressDataUrl(url, 850, 0.72);
+        optimizedUrls.push(compressed);
+      } else {
+        optimizedUrls.push(url);
+      }
+    }
+
+    // Step 2: Check total payload size
+    let totalLength = optimizedUrls.reduce((acc, u) => acc + (u ? u.length : 0), 0);
+    if (totalLength <= maxTotalBytes) {
+      return optimizedUrls;
+    }
+
+    // Step 3: If still over limit, downscale further to 650px & 0.65 quality
+    const secondPass: string[] = [];
+    for (const url of optimizedUrls) {
+      if (url && url.startsWith('data:image/')) {
+        const further = await this.compressDataUrl(url, 650, 0.65);
+        secondPass.push(further);
+      } else {
+        secondPass.push(url);
+      }
+    }
+
+    return secondPass;
   }
 
   public static sanitizeUrl(url: string, category?: string): string {
