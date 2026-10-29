@@ -209,5 +209,22 @@ service cloud.firestore {
       allow create: if isValidId(msgId);
       allow read, update, delete: if isAdmin();
     }
+
+    // Product Reviews and Ratings
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isValidId(reviewId) &&
+        request.resource.data.productId is string &&
+        request.resource.data.rating is number &&
+        request.resource.data.rating >= 1 &&
+        request.resource.data.rating <= 5 &&
+        request.resource.data.comment is string &&
+        request.resource.data.authorName is string;
+      allow update: if isValidId(reviewId) && (
+        isAdmin() ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['helpfulCount'])
+      );
+      allow delete: if isValidId(reviewId) && isAdmin();
+    }
   }
 }

@@ -122,9 +122,11 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { AdminLoginPage } from './AdminLoginPage';
 import { LogoFaviconSettings } from '../components/admin/LogoFaviconSettings';
+import { ProductService } from '../services/productService';
 import {
   generateAutoSku,
   getSkuSuggestions,
+  getBrandPrefix,
   isSkuUnique,
   SkuPattern,
 } from '../utils/skuGenerator';
@@ -625,17 +627,11 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
     setProdOriginalPrice(5100);
     setProdBrand('JAZMIN');
 
-    // Auto-generate unique next SKU using intelligent sequence scanner
-    const existingSkus = productList.map(p => p.sku || '').filter(Boolean);
-    const autoSku = generateAutoSku({
-      brand: 'JAZMIN',
-      categoryName: defaultCat.name,
-      categoryId: defaultCat.categoryId,
-      existingSkus,
-      pattern: 'SJ_SEQUENCE',
-    });
+    // Auto-generate unique SKU using ProductService generator with prefix and timestamp
+    const brandPrefix = getBrandPrefix('JAZMIN');
+    const autoSku = ProductService.generateSku(brandPrefix, Date.now());
     setProdSku(autoSku);
-    setProdSkuPattern('SJ_SEQUENCE');
+    setProdSkuPattern('TIMESTAMP_PREFIX');
     setProdIsSkuCustom(false);
 
     setProdStitchingType('Unstitched');
@@ -684,17 +680,25 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
 
   const handleGenerateSku = (pattern?: SkuPattern) => {
     const chosenPattern = pattern || prodSkuPattern;
-    const existingSkus = productList
-      .filter(p => !editingProduct || p.productId !== editingProduct.productId)
-      .map(p => p.sku || '')
-      .filter(Boolean);
-    const newSku = generateAutoSku({
-      brand: prodBrand.trim() || 'JAZMIN',
-      categoryName: prodCategoryName,
-      categoryId: prodCategory,
-      existingSkus,
-      pattern: chosenPattern,
-    });
+    const brandPrefix = getBrandPrefix(prodBrand.trim() || 'JAZMIN');
+
+    let newSku: string;
+    if (chosenPattern === 'TIMESTAMP_PREFIX') {
+      newSku = ProductService.generateSku(brandPrefix, Date.now());
+    } else {
+      const existingSkus = productList
+        .filter(p => !editingProduct || p.productId !== editingProduct.productId)
+        .map(p => p.sku || '')
+        .filter(Boolean);
+      newSku = generateAutoSku({
+        brand: prodBrand.trim() || 'JAZMIN',
+        categoryName: prodCategoryName,
+        categoryId: prodCategory,
+        existingSkus,
+        pattern: chosenPattern,
+      });
+    }
+
     setProdSku(newSku);
     if (pattern) setProdSkuPattern(pattern);
     setProdIsSkuCustom(false);
@@ -702,17 +706,22 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
 
   const handleBrandChange = (brand: string) => {
     setProdBrand(brand);
-    // If SKU hasn't been custom typed or it's a new product, auto-update with fresh brand prefix
+    // If SKU hasn't been custom typed or it's a new product, auto-update with fresh brand prefix and timestamp
     if (!prodIsSkuCustom && !editingProduct) {
-      const existingSkus = productList.map(p => p.sku || '').filter(Boolean);
-      const newSku = generateAutoSku({
-        brand: brand.trim() || 'JAZMIN',
-        categoryName: prodCategoryName,
-        categoryId: prodCategory,
-        existingSkus,
-        pattern: prodSkuPattern,
-      });
-      setProdSku(newSku);
+      const brandPrefix = getBrandPrefix(brand.trim() || 'JAZMIN');
+      if (prodSkuPattern === 'TIMESTAMP_PREFIX') {
+        setProdSku(ProductService.generateSku(brandPrefix, Date.now()));
+      } else {
+        const existingSkus = productList.map(p => p.sku || '').filter(Boolean);
+        const newSku = generateAutoSku({
+          brand: brand.trim() || 'JAZMIN',
+          categoryName: prodCategoryName,
+          categoryId: prodCategory,
+          existingSkus,
+          pattern: prodSkuPattern,
+        });
+        setProdSku(newSku);
+      }
     }
   };
 
@@ -845,13 +854,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
 
     let finalSku = prodSku.trim().toUpperCase();
     if (!finalSku) {
-      finalSku = generateAutoSku({
-        brand: prodBrand.trim() || 'JAZMIN',
-        categoryName,
-        categoryId: prodCategory,
-        existingSkus,
-        pattern: prodSkuPattern,
-      });
+      finalSku = ProductService.generateSku(getBrandPrefix(prodBrand.trim() || 'JAZMIN'), Date.now());
     }
 
     setSavingProduct(true);
@@ -4191,7 +4194,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                   <div className="mt-1.5 flex items-center justify-between gap-1 flex-wrap">
                     <div className="flex items-center gap-1">
                       <span className="text-[10px] text-slate-500">Pattern:</span>
-                      {(['SJ_SEQUENCE', 'BRAND_NUMBER', 'CATEGORY_BRAND', 'RONVEX_CODE'] as SkuPattern[]).map(patt => (
+                      {(['TIMESTAMP_PREFIX', 'SJ_SEQUENCE', 'BRAND_NUMBER', 'CATEGORY_BRAND', 'RONVEX_CODE'] as SkuPattern[]).map(patt => (
                         <button
                           key={patt}
                           type="button"
@@ -4202,7 +4205,7 @@ export const AdminPortalPage: React.FC<AdminPortalPageProps> = ({
                               : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
                           }`}
                         >
-                          {patt === 'SJ_SEQUENCE' ? 'SJ Sequence' : patt === 'BRAND_NUMBER' ? 'Brand' : patt === 'CATEGORY_BRAND' ? 'Cat+Brand' : 'RONVEX'}
+                          {patt === 'TIMESTAMP_PREFIX' ? 'Timestamp' : patt === 'SJ_SEQUENCE' ? 'SJ Sequence' : patt === 'BRAND_NUMBER' ? 'Brand' : patt === 'CATEGORY_BRAND' ? 'Cat+Brand' : 'RONVEX'}
                         </button>
                       ))}
                     </div>

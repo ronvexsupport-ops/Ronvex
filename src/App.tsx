@@ -3,6 +3,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db, testFirestoreConnection } from './services/firebase';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider, useCart } from './context/CartContext';
+import { WishlistProvider } from './context/WishlistContext';
 import { Product, ProductCategory, Order } from './types';
 import { bootstrapDatabase, INITIAL_PRODUCTS, getLocalProducts, saveLocalProducts } from './services/seedData';
 import { CategoryService, DEFAULT_CATEGORIES, getLocalCategories } from './services/categoryService';
@@ -20,6 +21,7 @@ import { ProductDetailPage } from './pages/ProductDetailPage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { OrderConfirmationPage } from './pages/OrderConfirmationPage';
 import { TrackOrderPage } from './pages/TrackOrderPage';
+import { WishlistPage } from './pages/WishlistPage';
 import { AffiliateStorefrontPage } from './pages/AffiliateStorefrontPage';
 import { AffiliateRegisterPage } from './pages/AffiliateRegisterPage';
 import { AffiliateStatusPage } from './pages/AffiliateStatusPage';
@@ -130,6 +132,9 @@ function AppContent() {
       } else if (route === 'track-order') {
         setCurrentView('track-order');
         setViewParam(undefined);
+      } else if (route === 'wishlist' || route === 'my-wishlist') {
+        setCurrentView('wishlist');
+        setViewParam(undefined);
       } else if (route === 'admin' || route === 'admin-portal') {
         setCurrentView('admin-portal');
         setViewParam(undefined);
@@ -214,6 +219,7 @@ function AppContent() {
     else if (targetView === 'product-detail' && param) window.location.hash = `product/${param}`;
     else if (targetView === 'affiliate-storefront' && param) window.location.hash = `store/${param}`;
     else if (targetView === 'track-order') window.location.hash = 'track-order';
+    else if (targetView === 'wishlist') window.location.hash = 'wishlist';
     else if (targetView === 'affiliate-status') window.location.hash = param ? `affiliate/status/${param}` : 'affiliate/status';
     else if (targetView === 'affiliate-register') window.location.hash = 'affiliate/register';
     else if (targetView === 'affiliate-dashboard') window.location.hash = 'affiliate/dashboard';
@@ -313,6 +319,13 @@ function AppContent() {
           <TrackOrderPage initialOrderNumber={viewParam} />
         )}
 
+        {currentView === 'wishlist' && (
+          <WishlistPage
+            onNavigate={handleNavigate}
+            onSelectProduct={handleSelectProduct}
+          />
+        )}
+
         {currentView === 'affiliate-storefront' && (
           <AffiliateStorefrontPage
             affiliateSlug={viewParam || 'techdeals-bd'}
@@ -387,7 +400,9 @@ export default function App() {
   return (
     <AuthProvider>
       <CartProvider>
-        <AppContent />
+        <WishlistProvider>
+          <AppContent />
+        </WishlistProvider>
       </CartProvider>
     </AuthProvider>
   );

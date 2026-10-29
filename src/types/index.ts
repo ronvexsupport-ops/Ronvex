@@ -505,3 +505,31 @@ export interface ActivityLog {
   details: string;
   timestamp: string;
 }
+
+// ---------------- Product Reviews & Ratings ----------------
+export interface ProductReview {
+  reviewId: string;
+  productId: string;
+  productName?: string;
+  rating: number; // 1 to 5
+  title: string;
+  comment: string;
+  authorName: string;
+  authorEmail?: string;
+  verifiedPurchase?: boolean;
+  helpfulCount?: number;
+  createdAt: string;
+}
+
+export interface ProductRatingSummary {
+  averageRating: number;
+  totalReviews: number;
+  starDistribution: {
+    5: number;
+    4: number;
+    3: number;
+    2: number;
+    1: number;
+  };
+}
+

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Search, User, ShieldCheck, TrendingUp, LogOut, ChevronDown, Menu, X, ArrowRight, Lock } from 'lucide-react';
+import { ShoppingBag, Search, User, ShieldCheck, TrendingUp, LogOut, ChevronDown, Menu, X, ArrowRight, Lock, Heart } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useWishlist } from '../context/WishlistContext';
 import { CMSService, DEFAULT_HEADER_CONFIG } from '../services/cmsService';
 import { HeaderConfig, ProductCategory } from '../types';
 
@@ -14,6 +15,7 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, categories, affiliateStorefrontSlug }) => {
   const { itemCount, setIsCartOpen, activeAttribution } = useCart();
+  const { wishlistCount } = useWishlist();
   const { currentUser, appUser, adminRecord, isAdmin, isAffiliate, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -60,6 +62,8 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, categor
       onNavigate('blog');
     } else if (clean === 'track-order') {
       onNavigate('track-order');
+    } else if (clean === 'wishlist' || clean === 'my-wishlist') {
+      onNavigate('wishlist');
     } else if (clean === 'admin' || clean === 'admin-portal') {
       onNavigate('admin-portal');
     } else {
@@ -261,6 +265,25 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, categor
                   </button>
                 )}
 
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    onNavigate('wishlist');
+                  }}
+                  className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-800"
+                >
+                  <Heart className="w-4 h-4 text-rose-500" />
+                  <div className="flex items-center justify-between flex-1">
+                    <span className="font-semibold">My Wishlist</span>
+                    {wishlistCount > 0 && (
+                      <span className="px-1.5 py-0.5 bg-rose-100 text-rose-700 rounded-full font-bold text-[10px]">
+                        {wishlistCount}
+                      </span>
+                    )}
+                  </div>
+                </button>
+
                 <div className="pt-1 mt-1 border-t border-slate-100">
                   <button
                     type="button"
@@ -279,11 +302,29 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, categor
             )}
           </div>
 
+          {/* Wishlist Trigger */}
+          <button
+            type="button"
+            onClick={() => onNavigate('wishlist')}
+            className={`relative p-2 transition-colors rounded-lg hover:bg-slate-100 cursor-pointer ${
+              currentView === 'wishlist' ? 'text-rose-600 bg-rose-50' : 'text-slate-700 hover:text-rose-600'
+            }`}
+            aria-label="View My Wishlist"
+            title="My Wishlist"
+          >
+            <Heart className={`w-5 h-5 ${wishlistCount > 0 ? 'fill-rose-500 text-rose-500' : ''}`} />
+            {wishlistCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-bold h-4 min-w-4 px-1 rounded-full flex items-center justify-center tabular-nums shadow-xs">
+                {wishlistCount}
+              </span>
+            )}
+          </button>
+
           {/* Cart Trigger */}
           <button
             type="button"
             onClick={() => setIsCartOpen(true)}
-            className="relative p-2 text-slate-700 hover:text-slate-950 transition-colors rounded-lg hover:bg-slate-100"
+            className="relative p-2 text-slate-700 hover:text-slate-950 transition-colors rounded-lg hover:bg-slate-100 cursor-pointer"
             aria-label="View Shopping Bag"
           >
             <ShoppingBag className="w-5 h-5" />
@@ -356,6 +397,23 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, categor
                 </button>
               </>
             )}
+
+            {/* Mobile Wishlist Access */}
+            <button
+              type="button"
+              onClick={() => handleMobileNav('wishlist')}
+              className="text-left py-2 px-3 hover:bg-rose-50 text-slate-800 rounded-lg flex items-center justify-between"
+            >
+              <div className="flex items-center gap-2 font-medium">
+                <Heart className={`w-4 h-4 ${wishlistCount > 0 ? 'fill-rose-500 text-rose-500' : 'text-slate-500'}`} />
+                <span>My Wishlist</span>
+              </div>
+              {wishlistCount > 0 && (
+                <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-xs font-bold rounded-full">
+                  {wishlistCount}
+                </span>
+              )}
+            </button>
 
             {/* Mobile "Join Affiliate Program" Button */}
             <button

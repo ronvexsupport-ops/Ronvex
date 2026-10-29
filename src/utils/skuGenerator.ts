@@ -1,6 +1,7 @@
 // Comprehensive SKU Auto-Generation and Uniqueness Engine
+import { ProductService } from '../services/productService';
 
-export type SkuPattern = 'SJ_SEQUENCE' | 'BRAND_NUMBER' | 'CATEGORY_BRAND' | 'RONVEX_CODE';
+export type SkuPattern = 'TIMESTAMP_PREFIX' | 'SJ_SEQUENCE' | 'BRAND_NUMBER' | 'CATEGORY_BRAND' | 'RONVEX_CODE';
 
 export interface SkuSuggestion {
   pattern: SkuPattern;
@@ -122,6 +123,12 @@ export function generateAutoSku(options: {
   let candidate = '';
 
   switch (pattern) {
+    case 'TIMESTAMP_PREFIX': {
+      // Uses ProductService to generate unique SKU using prefix and timestamp
+      candidate = ProductService.generateSku(brandCode || 'RNV', Date.now());
+      break;
+    }
+
     case 'SJ_SEQUENCE': {
       // Classic reference pattern matching "SJ0025", "SJ0026", etc.
       const highest = findHighestSequenceNumber('SJ', cleanExisting);
@@ -155,8 +162,7 @@ export function generateAutoSku(options: {
     }
 
     default: {
-      const highest = findHighestSequenceNumber('SJ', cleanExisting);
-      candidate = `SJ${String(highest > 0 ? highest + 1 : 26).padStart(4, '0')}`;
+      candidate = ProductService.generateSku(brandCode || 'RNV', Date.now());
     }
   }
 
@@ -172,7 +178,7 @@ export function generateAutoSku(options: {
 }
 
 /**
- * Returns 4 instant SKU presets for the admin UI to choose from
+ * Returns instant SKU presets for the admin UI to choose from
  */
 export function getSkuSuggestions(options: {
   brand?: string;
@@ -183,6 +189,12 @@ export function getSkuSuggestions(options: {
   const { brand = 'JAZMIN', categoryName = "Women's Clothing", categoryId = 'women-clothing', existingSkus = [] } = options;
 
   return [
+    {
+      pattern: 'TIMESTAMP_PREFIX',
+      label: 'Prefix + Timestamp',
+      sku: generateAutoSku({ brand, categoryName, categoryId, existingSkus, pattern: 'TIMESTAMP_PREFIX' }),
+      description: 'Timestamp-based unique SKU (e.g. JAZ-1793201021948)',
+    },
     {
       pattern: 'SJ_SEQUENCE',
       label: 'SJ Sequence',

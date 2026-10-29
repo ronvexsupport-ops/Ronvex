@@ -1,8 +1,9 @@
 import React from 'react';
-import { ShoppingBag, ArrowRight } from 'lucide-react';
+import { ShoppingBag, ArrowRight, Heart, Star } from 'lucide-react';
 import { Product } from '../types';
 import { PricingEngine } from '../services/pricingEngine';
 import { useCart } from '../context/CartContext';
+import { useWishlist } from '../context/WishlistContext';
 import { ImageService, DEFAULT_FALLBACK_IMAGE } from '../services/imageService';
 
 interface ProductCardProps {
@@ -19,6 +20,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   isAffiliateView,
 }) => {
   const { addToCart } = useCart();
+  const { isInWishlist, toggleWishlist } = useWishlist();
+  const isWishlisted = isInWishlist(product.productId);
   const displayPrice = customSellingPrice !== undefined ? customSellingPrice : product.adminBasePrice;
   const imageUrl = ImageService.resolveProductImage(product.imageUrls?.[0], product.categoryId);
 
@@ -59,6 +62,25 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             Only {product.stockQuantity} remaining
           </div>
         )}
+        {/* Wishlist Heart Toggle Button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleWishlist(product);
+          }}
+          className={`absolute top-2.5 right-2.5 p-1.5 rounded-full transition-all duration-200 z-20 cursor-pointer shadow-xs ${
+            isWishlisted
+              ? 'bg-rose-50 text-rose-600 scale-105'
+              : 'bg-white/80 hover:bg-white text-slate-500 hover:text-rose-600'
+          }`}
+          title={isWishlisted ? 'Remove from Wishlist' : 'Save to Wishlist'}
+          aria-label={isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}
+        >
+          <Heart className={`w-3.5 h-3.5 ${isWishlisted ? 'fill-rose-500 text-rose-500' : ''}`} />
+        </button>
+
         {product.imageUrls && product.imageUrls.length > 1 && (
           <div className="absolute bottom-2.5 right-2.5 bg-black/60 backdrop-blur-xs text-white text-[10px] font-medium px-1.5 py-0.5 rounded-md flex items-center gap-1">
             <span>+{product.imageUrls.length} photos</span>
@@ -69,11 +91,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       {/* Product Content Details */}
       <div className="p-2.5 sm:p-4 flex flex-col flex-1 justify-between gap-2 sm:gap-3">
         <div>
-          {/* Brand or Category */}
-          <div className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs text-slate-500 mb-1 truncate">
+          {/* Brand or Category & Star Rating */}
+          <div className="flex items-center justify-between text-[10px] sm:text-xs text-slate-500 mb-1 gap-1">
             <span className="font-semibold uppercase tracking-wider text-slate-700 truncate">{product.brand || product.categoryName}</span>
-            <span aria-hidden="true">·</span>
-            <span className="shrink-0">{product.stockQuantity > 0 ? 'In Stock' : 'Out'}</span>
+            <div className="flex items-center gap-0.5 text-amber-500 font-bold text-[10px] shrink-0">
+              <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+              <span>4.9</span>
+            </div>
           </div>
 
           <h3 className="line-clamp-2 min-h-[2.2rem] sm:min-h-0">
